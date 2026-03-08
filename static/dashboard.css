@@ -1,79 +1,193 @@
-body {
-    font-family: 'Inter', sans-serif;
-    background-color: #121212;
-    color: white;
-    text-align: center;
-    padding: 20px;
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --navy: #0d1b2a;
+  --navy-mid: #1a2d42;
+  --accent: #2e9cca;
+  --muted: #8da0b3;
+  --bg: #f0f4f8;
+  --card: #ffffff;
+  --border: #d6e0ea;
+  --text: #1a2d42;
+  --text-lt: #4a6278;
+  --editor-bg: #13202f;
+  --editor-panel: #1c2e41;
+  --editor-border: #2a3f57;
+  --editor-accent: #2e9cca;
 }
 
-.title {
-    font-size: 2rem;
-    margin-bottom: 20px;
-    color: #00e5ff;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+h3 {
+  font-size: 1.2rem;
+  font-weight: 400;
+  color: var(--text-lt);
+  text-align: center;
+  margin-bottom: 3rem;
 }
 
 .tiles-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
 }
 
 .tile {
-    background: #ffffff;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s;
-    color: #333333; /* Darker text color for better contrast */
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+
+.tile::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--editor-accent));
 }
 
 .tile:hover {
-    transform: scale(1.05);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: var(--accent);
+}
+
+.running-status {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: none;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .tile i {
-    font-size: 3rem;
-    margin-bottom: 10px;
-    color: #333333; /* Darker icon color */
+  font-size: 3rem;
+  color: var(--accent);
+  margin-bottom: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.tile:hover i {
+  transform: scale(1.1);
 }
 
 .tile h3 {
-    color: #333333; /* Darker font for better contrast */
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 1.5rem;
+  text-align: center;
 }
 
-.control-buttons {
-    display: flex;
-    justify-content: center;
-    margin-top: 10px;
-    gap: 10px;
+.tile-buttons {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
 }
 
-.control-buttons button {
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: 600;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    color: #ffffff;
+.tile-button {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'DM Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.control-buttons button.start {
-    background-color: #4CAF50;
+.tile-button.start {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
-.control-buttons button.stop {
-    background-color: #F44336;
+.tile-button.start:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
-.control-buttons button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-    color: #666666;
+.tile-button.stop {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
 }
 
-.control-buttons button:hover:not(:disabled) {
-    opacity: 0.8;
+.tile-button.stop:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.tile-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 768px) {
+  .tiles-container {
+    grid-template-columns: 1fr;
+    padding: 0 1rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h3 {
+    font-size: 1rem;
+  }
+
+  .tile {
+    padding: 1.25rem;
+  }
 }
 
