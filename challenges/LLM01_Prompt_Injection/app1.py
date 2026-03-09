@@ -137,7 +137,7 @@ def chat():
         # Special case: /fetch bypasses guardian
         if user_input.startswith("/fetch "):
             print("[DEBUG] Bypassing guardian for /fetch")
-            url = user_input.split("/fetch ", 1)[1]
+            url = user_input.split("/fetch ", 1)[1].strip().strip("[]")
             bot_response = summarize_webpage(url)
         else:
             # Guardian check for regular inputs
