@@ -39,7 +39,9 @@ textarea {
 }
 
 button {
-    padding: 10px 20px;
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
     background-color: #00e5ff;
     border: none;
     color: black;
@@ -48,6 +50,7 @@ button {
     border-radius: 5px;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    box-sizing: border-box;
 }
 
 button:hover {
