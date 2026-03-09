@@ -172,6 +172,121 @@ h3 {
   box-shadow: none !important;
 }
 
+/* Mode Panel (top-left) */
+.mode-panel {
+  position: fixed;
+  top: 1.25rem;
+  left: 1.25rem;
+  z-index: 100;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  padding: 0.85rem 1rem;
+  min-width: 230px;
+  max-width: 300px;
+  font-size: 0.85rem;
+  transition: border-color 0.2s;
+}
+
+.mode-panel.lite-active {
+  border-color: #10b981;
+  box-shadow: 0 4px 16px rgba(16,185,129,0.15);
+}
+
+.mode-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.mode-label {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+}
+
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #cbd5e1;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider { background: #10b981; }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+.mode-models-hint {
+  color: var(--text-lt);
+  font-size: 0.72rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.mode-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.mode-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.pull-btn   { background: #dbeafe; color: #1e40af; }
+.pull-btn:hover:not(:disabled)   { background: #93c5fd; }
+.remove-btn { background: #fee2e2; color: #991b1b; }
+.remove-btn:hover:not(:disabled) { background: #fca5a5; }
+
+.pull-log {
+  margin-top: 0.6rem;
+  background: var(--editor-bg);
+  color: #a3e635;
+  font-family: monospace;
+  font-size: 0.7rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 /* Ollama Status Panel */
 .ollama-panel {
   position: fixed;

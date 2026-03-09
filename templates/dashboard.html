@@ -3,14 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OWASP LLM Top 10 Dashboard</title>
+  <title>AI Security Lab — OWASP LLM Top 10</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
 <body>
 
-  <!-- Ollama Status Panel -->
+  <!-- Lite / Full mode panel (top-left) -->
+  <div class="mode-panel" id="modePanel">
+    <div class="mode-toggle-row">
+      <span class="mode-label" id="modeLabel">{{ 'Lite Mode' if lite_mode else 'Full Mode' }}</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="liteToggle" {% if lite_mode %}checked{% endif %}>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="mode-models-hint" id="modeHint">
+      {{ 'phi3:mini + granite3.1-moe:1b' if lite_mode else 'mistral · llama3 · sqlcoder · granite3-guardian · granite3.1-moe:1b' }}
+    </div>
+    <div class="mode-actions">
+      <button class="mode-btn pull-btn" id="pullBtn" onclick="pullModels()">
+        <i class="fas fa-download"></i> Pull Models
+      </button>
+      <button class="mode-btn remove-btn" id="removeBtn" onclick="removeModels()">
+        <i class="fas fa-trash"></i> Remove Models
+      </button>
+    </div>
+    <div class="pull-log" id="pullLog" style="display:none;"></div>
+  </div>
+
+  <!-- Ollama Status Panel (top-right) -->
   <div class="ollama-panel" id="ollamaPanel">
     <div class="ollama-header">
       <span class="ollama-dot" id="ollamaDot"></span>
@@ -20,7 +43,7 @@
     <div class="ollama-models" id="ollamaModels"></div>
   </div>
 
-  <h1>PromptMe</h1>
+  <h1>AI Security Lab</h1>
   <h3>OWASP LLM Top 10 CTF Challenges</h3>
   <div class="tiles-container">
     {% for risk in risks %}
@@ -37,6 +60,7 @@
   </div>
 
   <script>
+    // ── Challenge start/stop ──────────────────────────────────────────────────
     function startChallenge(challengeId) {
       window.open(`/start/${challengeId}`, '_blank');
       document.getElementById(`status-${challengeId}`).style.display = 'block';
@@ -46,10 +70,84 @@
       fetch(`/stop/${challengeId}`)
         .then(response => response.text())
         .then(alert);
-
       document.getElementById(`status-${challengeId}`).style.display = 'none';
     }
 
+    // ── Lite / Full toggle ────────────────────────────────────────────────────
+    const MODELS_HINT = {
+      lite: 'phi3:mini + granite3.1-moe:1b',
+      full: 'mistral · llama3 · sqlcoder · granite3-guardian · granite3.1-moe:1b'
+    };
+
+    document.getElementById('liteToggle').addEventListener('change', function () {
+      const anyRunning = Object.keys(window._runningIds || {}).length > 0;
+      if (anyRunning) {
+        const ok = confirm(
+          'A challenge is currently running. Switching mode will not affect it until restarted. Continue?'
+        );
+        if (!ok) {
+          this.checked = !this.checked;
+          return;
+        }
+      }
+      fetch('/mode/toggle', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          const isLite = data.lite;
+          document.getElementById('modeLabel').textContent = isLite ? 'Lite Mode' : 'Full Mode';
+          document.getElementById('modeHint').textContent = isLite ? MODELS_HINT.lite : MODELS_HINT.full;
+          document.getElementById('modePanel').classList.toggle('lite-active', isLite);
+        });
+    });
+
+    // ── Pull models (SSE) ─────────────────────────────────────────────────────
+    function pullModels() {
+      const log = document.getElementById('pullLog');
+      const btn = document.getElementById('pullBtn');
+      log.style.display = 'block';
+      log.textContent = '';
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pulling…';
+
+      const es = new EventSource('/ollama/pull-stream');
+      es.onmessage = (e) => {
+        if (e.data === '__DONE__') {
+          es.close();
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-download"></i> Pull Models';
+          log.textContent += '\nAll done!';
+          refreshOllama();
+          return;
+        }
+        log.textContent += e.data + '\n';
+        log.scrollTop = log.scrollHeight;
+      };
+      es.onerror = () => {
+        es.close();
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-download"></i> Pull Models';
+        log.textContent += '\nConnection error.';
+      };
+    }
+
+    // ── Remove all PromptMe models ────────────────────────────────────────────
+    function removeModels() {
+      if (!confirm('Remove all AI Security Lab models from Ollama? This frees disk space but you will need to pull them again.')) return;
+      const btn = document.getElementById('removeBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removing…';
+      fetch('/ollama/remove-all', { method: 'POST' })
+        .then(r => r.json())
+        .then(results => {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-trash"></i> Remove Models';
+          const summary = Object.entries(results).map(([m, s]) => `${m}: ${s}`).join('\n');
+          alert('Done:\n' + summary);
+          refreshOllama();
+        });
+    }
+
+    // ── Ollama status panel ───────────────────────────────────────────────────
     function formatSize(bytes) {
       if (!bytes) return '';
       const gb = bytes / 1e9;
@@ -82,7 +180,7 @@
               : `<span class="model-badge idle">Idle</span>`;
             const btn = isLoaded
               ? `<button class="model-btn unload" onclick="unloadModel('${m.name}')">Unload</button>`
-              : `<button class="model-btn load" onclick="loadModel('${m.name}')">Load</button>`;
+              : `<button class="model-btn load" onclick="loadModel('${m.name}', event)">Load</button>`;
             return `<div class="model-row">
               <span class="model-name">${m.name}</span>
               <span class="model-size">${sizeStr}</span>
@@ -98,18 +196,18 @@
     }
 
     function unloadModel(name) {
-      fetch(`/ollama/unload/${name}`, { method: 'POST' })
-        .then(() => refreshOllama());
+      fetch(`/ollama/unload/${name}`, { method: 'POST' }).then(() => refreshOllama());
     }
 
-    function loadModel(name) {
-      const btn = event.target;
+    function loadModel(name, e) {
+      const btn = e.target;
       btn.disabled = true;
       btn.textContent = 'Loading…';
-      fetch(`/ollama/load/${name}`, { method: 'POST' })
-        .then(() => refreshOllama());
+      fetch(`/ollama/load/${name}`, { method: 'POST' }).then(() => refreshOllama());
     }
 
+    // Init
+    document.getElementById('modePanel').classList.toggle('lite-active', {{ 'true' if lite_mode else 'false' }});
     refreshOllama();
     setInterval(refreshOllama, 20000);
   </script>
