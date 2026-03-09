@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, request
+from flask import Flask, render_template, redirect, request, jsonify
 import subprocess, sys, os, requests, psutil, time, socket
 
 app = Flask(__name__)
@@ -121,6 +121,44 @@ def stop_challenge_route(challenge_id):
         return f"Challenge {challenge_id} stopped."
 
     return f"No running instance for Challenge {challenge_id}."
+
+OLLAMA_BASE = "http://localhost:11434"
+
+@app.route('/ollama/status')
+def ollama_status():
+    try:
+        tags_resp = requests.get(f"{OLLAMA_BASE}/api/tags", timeout=3)
+        pulled = tags_resp.json().get('models', [])
+        ps_resp = requests.get(f"{OLLAMA_BASE}/api/ps", timeout=3)
+        loaded = ps_resp.json().get('models', [])
+        loaded_names = {m['name'] for m in loaded}
+        return jsonify({
+            'running': True,
+            'pulled': [{'name': m['name'], 'size': m.get('size', 0)} for m in pulled],
+            'loaded_names': list(loaded_names)
+        })
+    except Exception:
+        return jsonify({'running': False, 'pulled': [], 'loaded_names': []})
+
+@app.route('/ollama/unload/<path:model_name>', methods=['POST'])
+def ollama_unload(model_name):
+    try:
+        requests.post(f"{OLLAMA_BASE}/api/generate",
+                      json={"model": model_name, "keep_alive": 0},
+                      timeout=5)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/ollama/load/<path:model_name>', methods=['POST'])
+def ollama_load(model_name):
+    try:
+        requests.post(f"{OLLAMA_BASE}/api/generate",
+                      json={"model": model_name, "keep_alive": -1, "prompt": ""},
+                      timeout=30)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)

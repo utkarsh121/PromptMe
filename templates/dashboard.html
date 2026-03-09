@@ -9,6 +9,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
 <body>
+
+  <!-- Ollama Status Panel -->
+  <div class="ollama-panel" id="ollamaPanel">
+    <div class="ollama-header">
+      <span class="ollama-dot" id="ollamaDot"></span>
+      <span class="ollama-title">Ollama</span>
+      <span class="ollama-status-text" id="ollamaStatusText">checking...</span>
+    </div>
+    <div class="ollama-models" id="ollamaModels"></div>
+  </div>
+
   <h1>PromptMe</h1>
   <h3>OWASP LLM Top 10 CTF Challenges</h3>
   <div class="tiles-container">
@@ -38,6 +49,69 @@
 
       document.getElementById(`status-${challengeId}`).style.display = 'none';
     }
+
+    function formatSize(bytes) {
+      if (!bytes) return '';
+      const gb = bytes / 1e9;
+      return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / 1e6).toFixed(0)} MB`;
+    }
+
+    function refreshOllama() {
+      fetch('/ollama/status')
+        .then(r => r.json())
+        .then(data => {
+          const dot = document.getElementById('ollamaDot');
+          const statusText = document.getElementById('ollamaStatusText');
+          const modelsDiv = document.getElementById('ollamaModels');
+
+          if (data.running) {
+            dot.className = 'ollama-dot online';
+            statusText.textContent = `${data.pulled.length} model${data.pulled.length !== 1 ? 's' : ''} pulled`;
+          } else {
+            dot.className = 'ollama-dot offline';
+            statusText.textContent = 'not running';
+            modelsDiv.innerHTML = '';
+            return;
+          }
+
+          modelsDiv.innerHTML = data.pulled.map(m => {
+            const isLoaded = data.loaded_names.includes(m.name);
+            const sizeStr = formatSize(m.size);
+            const badge = isLoaded
+              ? `<span class="model-badge loaded">Loaded</span>`
+              : `<span class="model-badge idle">Idle</span>`;
+            const btn = isLoaded
+              ? `<button class="model-btn unload" onclick="unloadModel('${m.name}')">Unload</button>`
+              : `<button class="model-btn load" onclick="loadModel('${m.name}')">Load</button>`;
+            return `<div class="model-row">
+              <span class="model-name">${m.name}</span>
+              <span class="model-size">${sizeStr}</span>
+              ${badge}${btn}
+            </div>`;
+          }).join('');
+        })
+        .catch(() => {
+          document.getElementById('ollamaDot').className = 'ollama-dot offline';
+          document.getElementById('ollamaStatusText').textContent = 'not running';
+          document.getElementById('ollamaModels').innerHTML = '';
+        });
+    }
+
+    function unloadModel(name) {
+      fetch(`/ollama/unload/${name}`, { method: 'POST' })
+        .then(() => refreshOllama());
+    }
+
+    function loadModel(name) {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = 'Loading…';
+      fetch(`/ollama/load/${name}`, { method: 'POST' })
+        .then(() => refreshOllama());
+    }
+
+    refreshOllama();
+    setInterval(refreshOllama, 20000);
   </script>
 </body>
 </html>

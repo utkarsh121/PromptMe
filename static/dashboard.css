@@ -172,6 +172,107 @@ h3 {
   box-shadow: none !important;
 }
 
+/* Ollama Status Panel */
+.ollama-panel {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 100;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+  padding: 0.75rem 1rem;
+  min-width: 220px;
+  max-width: 300px;
+  font-size: 0.85rem;
+}
+
+.ollama-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ollama-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ccc;
+  flex-shrink: 0;
+}
+
+.ollama-dot.online  { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+.ollama-dot.offline { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.4); }
+
+.ollama-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ollama-status-text {
+  color: var(--text-lt);
+  font-size: 0.78rem;
+  margin-left: auto;
+}
+
+.ollama-models {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.model-name {
+  flex: 1;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-size {
+  color: var(--text-lt);
+  flex-shrink: 0;
+}
+
+.model-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.model-badge.loaded { background: #d1fae5; color: #065f46; }
+.model-badge.idle   { background: #f1f5f9; color: #64748b; }
+
+.model-btn {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.model-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.model-btn.unload { background: #fee2e2; color: #991b1b; }
+.model-btn.unload:hover:not(:disabled) { background: #fca5a5; }
+.model-btn.load   { background: #dbeafe; color: #1e40af; }
+.model-btn.load:hover:not(:disabled)   { background: #93c5fd; }
+
 @media (max-width: 768px) {
   .tiles-container {
     grid-template-columns: 1fr;
