@@ -199,9 +199,11 @@ def pull_stream():
     else:
         models = MODELS_LITE if lite_mode else MODELS_FULL
 
+    import json as _json
+
     def generate():
         for model in models:
-            yield f"data: Pulling {model}...\n\n"
+            yield f"data: {_json.dumps({'type': 'start', 'model': model})}\n\n"
             try:
                 with requests.post(
                     f"{OLLAMA_BASE}/api/pull",
@@ -210,17 +212,18 @@ def pull_stream():
                 ) as resp:
                     for line in resp.iter_lines():
                         if line:
-                            import json as _json
                             try:
                                 obj = _json.loads(line)
                                 status = obj.get("status", "")
-                                if status:
-                                    yield f"data: {status}\n\n"
+                                completed = obj.get("completed", 0)
+                                total = obj.get("total", 0)
+                                pct = int(completed / total * 100) if total > 0 else None
+                                yield f"data: {_json.dumps({'type': 'progress', 'model': model, 'status': status, 'pct': pct})}\n\n"
                             except Exception:
                                 pass
-                yield f"data: [{model}] done\n\n"
+                yield f"data: {_json.dumps({'type': 'done', 'model': model})}\n\n"
             except Exception as e:
-                yield f"data: [{model}] error: {e}\n\n"
+                yield f"data: {_json.dumps({'type': 'error', 'model': model, 'msg': str(e)})}\n\n"
         yield "data: __DONE__\n\n"
 
     return Response(stream_with_context(generate()),

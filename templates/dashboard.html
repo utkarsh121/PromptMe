@@ -105,7 +105,7 @@
       const log = document.getElementById('pullLog');
       const btn = document.getElementById('pullBtn');
       log.style.display = 'block';
-      log.textContent = '';
+      log.innerHTML = '';
       btn.disabled = true;
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pulling…';
 
@@ -115,18 +115,62 @@
           es.close();
           btn.disabled = false;
           btn.innerHTML = '<i class="fas fa-download"></i> Pull Models';
-          log.textContent += '\nAll done!';
           refreshOllama();
           return;
         }
-        log.textContent += e.data + '\n';
-        log.scrollTop = log.scrollHeight;
+        let msg;
+        try { msg = JSON.parse(e.data); } catch { return; }
+
+        if (msg.type === 'start') {
+          const safeId = msg.model.replace(/[^a-zA-Z0-9]/g, '_');
+          const row = document.createElement('div');
+          row.className = 'pull-model-row';
+          row.id = `pull-row-${safeId}`;
+          row.innerHTML = `
+            <div class="pull-model-header">
+              <span class="pull-model-name">${msg.model}</span>
+              <span class="pull-model-pct" id="pull-pct-${safeId}">—</span>
+            </div>
+            <div class="pull-model-status" id="pull-status-${safeId}">starting…</div>
+            <div class="pull-bar-wrap">
+              <div class="pull-bar-fill" id="pull-bar-${safeId}" style="width:0%"></div>
+            </div>`;
+          log.appendChild(row);
+
+        } else if (msg.type === 'progress') {
+          const safeId = msg.model.replace(/[^a-zA-Z0-9]/g, '_');
+          const statusEl = document.getElementById(`pull-status-${safeId}`);
+          const barEl    = document.getElementById(`pull-bar-${safeId}`);
+          const pctEl    = document.getElementById(`pull-pct-${safeId}`);
+          if (statusEl) statusEl.textContent = msg.status || '';
+          if (barEl && msg.pct !== null) {
+            barEl.style.width = msg.pct + '%';
+            if (pctEl) pctEl.textContent = msg.pct + '%';
+          }
+
+        } else if (msg.type === 'done') {
+          const safeId = msg.model.replace(/[^a-zA-Z0-9]/g, '_');
+          const barEl    = document.getElementById(`pull-bar-${safeId}`);
+          const pctEl    = document.getElementById(`pull-pct-${safeId}`);
+          const statusEl = document.getElementById(`pull-status-${safeId}`);
+          const row      = document.getElementById(`pull-row-${safeId}`);
+          if (barEl)    barEl.style.width = '100%';
+          if (pctEl)    pctEl.textContent = '100%';
+          if (statusEl) statusEl.textContent = 'done ✓';
+          if (row)      row.classList.add('pull-model-done');
+
+        } else if (msg.type === 'error') {
+          const safeId = msg.model.replace(/[^a-zA-Z0-9]/g, '_');
+          const statusEl = document.getElementById(`pull-status-${safeId}`);
+          const row      = document.getElementById(`pull-row-${safeId}`);
+          if (statusEl) statusEl.textContent = `Error: ${msg.msg}`;
+          if (row)      row.classList.add('pull-model-error');
+        }
       };
       es.onerror = () => {
         es.close();
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-download"></i> Pull Models';
-        log.textContent += '\nConnection error.';
       };
     }
 
