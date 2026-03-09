@@ -29,7 +29,7 @@ split_docs = text_splitter.split_documents(docs)
 vectorstore = FAISS.from_documents(split_docs, embedding_model)
 
 
-llm = Ollama(model="mistral")
+llm = Ollama(model=os.getenv('PROMPTME_CHAT_MODEL', 'mistral'))
 
 @app.route("/")
 def home():

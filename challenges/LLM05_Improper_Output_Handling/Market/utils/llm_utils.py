@@ -1,5 +1,6 @@
 import subprocess
 import re
+import os
 
 def generate_sql_prompt(natural_language_prompt):
     return f"""
@@ -36,7 +37,9 @@ def extract_sql_from_output(output: str) -> str:
     match = re.search(r"(SELECT|INSERT|UPDATE|DELETE)[\s\S]+?;", output, re.IGNORECASE)
     return match.group(0).strip() if match else output.strip()
 
-def query_llm(prompt: str, model="sqlcoder"):
+def query_llm(prompt: str, model=None):
+    if model is None:
+        model = os.getenv('PROMPTME_SQL_MODEL', 'sqlcoder')
     """
     Sends a prompt to the LLM via Ollama and extracts + sanitizes the SQL query.
     """

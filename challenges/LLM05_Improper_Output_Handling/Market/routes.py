@@ -114,7 +114,9 @@ def LogoutPage():
     flash("You have been logged out!", category='info')
     return redirect(url_for('HomePage'))
 
-def run_ollama(prompt, model="llama3"):
+def run_ollama(prompt, model=None):
+    if model is None:
+        model = os.getenv('PROMPTME_CHAT_MODEL', 'llama3')
     import subprocess
     result = subprocess.run(
         ["ollama", "run", model],

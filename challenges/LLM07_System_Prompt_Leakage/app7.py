@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request
 from langchain_ollama import ChatOllama
+import os
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import (
     SystemMessagePromptTemplate, 
@@ -8,7 +9,7 @@ from langchain_core.prompts import (
 )
 
 app = Flask(__name__)
-model = ChatOllama(model="mistral", base_url="http://localhost:11434/")
+model = ChatOllama(model=os.getenv('PROMPTME_CHAT_MODEL', 'mistral'), base_url="http://localhost:11434/")
 
 # System prompt with hidden API key
 system_prompt = """You are a helpful and ethical AI assistant. 

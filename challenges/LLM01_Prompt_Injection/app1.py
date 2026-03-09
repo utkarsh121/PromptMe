@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import uuid
 import ollama
+import os
 from markupsafe import Markup
 
 app = Flask(__name__)
@@ -31,7 +32,7 @@ def store_message(user_id, role, content):
 # Main chat model call
 def call_ollama(prompt):
     response = ollama.chat(
-        model='mistral',  # Your main chat model
+        model=os.getenv('PROMPTME_CHAT_MODEL', 'mistral'),
         messages=[{"role": "user", "content": prompt}]
     )
     return response['message']['content']
@@ -49,7 +50,7 @@ def check_malicious_input(user_input):
 
     try:
         response = ollama.chat(
-            model='granite3-guardian',
+            model=os.getenv('PROMPTME_GUARDIAN_MODEL', 'granite3-guardian'),
             messages=[{"role": "user", "content": guardian_prompt}]
         )
         verdict_raw = response['message']['content'].strip()
