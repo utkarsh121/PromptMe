@@ -17,19 +17,19 @@ Step 3: As this is Data and Model Poisoning challenge, and the hint suggests to 
 
 Step 4: On using Prompts like "What is the source of information" or "What is your knowledge base"
 
-![1](https://github.com/R3dShad0w7/PromptMe/blob/main/solutions/LLM04_Data_and_Model_Poisoning/1.jpg)
+![1](https://github.com/R3dShad0w7/AI Security Lab/blob/main/solutions/LLM04_Data_and_Model_Poisoning/1.jpg)
 
 Step 5: Now that we know the location of data used to answer, and is publically editable let's modify the entries as asked. 
 
 Step 6: Will replace LLM01 with LLM02 and update it. Try fetching OWASP Top list now. 
 
-![2](https://github.com/R3dShad0w7/PromptMe/blob/main/solutions/LLM04_Data_and_Model_Poisoning/2.jpg)
+![2](https://github.com/R3dShad0w7/AI Security Lab/blob/main/solutions/LLM04_Data_and_Model_Poisoning/2.jpg)
 
 Step 7: Please note you might have to prompt multiple times, as it might respond from previous cache. Try using Reload Knowledge Base option.
 
 Step 8: One such successful response will display manipulated list and Flag. 
 
-![3](https://github.com/R3dShad0w7/PromptMe/blob/main/solutions/LLM04_Data_and_Model_Poisoning/3.jpg)
+![3](https://github.com/R3dShad0w7/AI Security Lab/blob/main/solutions/LLM04_Data_and_Model_Poisoning/3.jpg)
 
 
 # Mitigation

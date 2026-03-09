@@ -20,11 +20,11 @@ Purchase an item to solve the challenge
 
 - Prompt to list users, and update balance of the logged in user
 
-![1](https://github.com/R3dShad0w7/PromptMe/blob/main/solutions/LLM05_ImproperOutputHandling/1.jpg)
+![1](https://github.com/R3dShad0w7/AI Security Lab/blob/main/solutions/LLM05_ImproperOutputHandling/1.jpg)
 
 - Now, that we have balance in our account, we can purchase itema dn solve the challenge
 
-![2](https://github.com/R3dShad0w7/PromptMe/blob/main/solutions/LLM05_ImproperOutputHandling/2.jpg)
+![2](https://github.com/R3dShad0w7/AI Security Lab/blob/main/solutions/LLM05_ImproperOutputHandling/2.jpg)
 
 - And there we have a flag and challenge is solved. 
 # Prevention and Mitigation Strategies

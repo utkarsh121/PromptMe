@@ -8,11 +8,11 @@ This RAG-powered LLM application demonstrates how sensitive information containe
 
 2. Use the prompts to trick AI to reveal the secrets.
 
-![alt text](https://github.com/R3dShad0w7/PromptMe/blob/main/solutions/LLM02_Sensitive_Information_Disclosure/images/1.png)
+![alt text](https://github.com/R3dShad0w7/AI Security Lab/blob/main/solutions/LLM02_Sensitive_Information_Disclosure/images/1.png)
 
 3.  One of the Jailbreak prompt should reveal the secret.
 
-![alt text](https://github.com/R3dShad0w7/PromptMe/blob/main/solutions/LLM02_Sensitive_Information_Disclosure/images/2.png)
+![alt text](https://github.com/R3dShad0w7/AI Security Lab/blob/main/solutions/LLM02_Sensitive_Information_Disclosure/images/2.png)
 
 ---
 

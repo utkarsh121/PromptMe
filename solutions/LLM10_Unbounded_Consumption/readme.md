@@ -21,7 +21,7 @@ Describe in detail the complete genealogy of all U.S. Presidents, starting from 
 ```
 This prompt causes potentials DoS and reveals the flag
 
-![1](https://github.com/R3dShad0w7/PromptMe/blob/main/solutions/LLM10_Unbounded_Consumption/01.jpg)
+![1](https://github.com/R3dShad0w7/AI Security Lab/blob/main/solutions/LLM10_Unbounded_Consumption/01.jpg)
 
 
 # Mitigation
