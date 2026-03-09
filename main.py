@@ -202,17 +202,25 @@ def pull_stream():
     def generate():
         for model in models:
             yield f"data: Pulling {model}...\n\n"
-            proc = subprocess.Popen(
-                ["ollama", "pull", model],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-            )
-            for line in proc.stdout:
-                line = line.strip()
-                if line:
-                    yield f"data: {line}\n\n"
-            proc.wait()
-            status = "done" if proc.returncode == 0 else "error"
-            yield f"data: [{model}] {status}\n\n"
+            try:
+                with requests.post(
+                    f"{OLLAMA_BASE}/api/pull",
+                    json={"name": model, "stream": True},
+                    stream=True, timeout=600
+                ) as resp:
+                    for line in resp.iter_lines():
+                        if line:
+                            import json as _json
+                            try:
+                                obj = _json.loads(line)
+                                status = obj.get("status", "")
+                                if status:
+                                    yield f"data: {status}\n\n"
+                            except Exception:
+                                pass
+                yield f"data: [{model}] done\n\n"
+            except Exception as e:
+                yield f"data: [{model}] error: {e}\n\n"
         yield "data: __DONE__\n\n"
 
     return Response(stream_with_context(generate()),
