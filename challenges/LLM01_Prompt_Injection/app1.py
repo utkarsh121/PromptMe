@@ -129,7 +129,9 @@ def chat():
         return redirect(url_for('index'))
 
     if request.method == 'POST':
-        user_input = request.form.get('message')
+        user_input = request.form.get('message', '').strip()
+        if not user_input:
+            return redirect(url_for('chat'))
         store_message(user_id, "user", user_input)
 
         print("[DEBUG] Received input:", user_input)
