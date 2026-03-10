@@ -29,6 +29,16 @@ API_KEY=d368130b3370c44860743687208a846e
 
 The app also exposes a `/api/debug` endpoint that was left enabled after development — it returns internal configuration, including the full system prompt, as JSON.
 
+### How the lab demonstrates it
+
+| Component | Role |
+|-----------|------|
+| `app7.py` — `system_prompt` | API key hardcoded directly in the LLM's system context |
+| `app7.py` — `/api/debug` | Unauthenticated endpoint returns full system prompt as JSON |
+| `app7.py` — `/ask` | User input passed verbatim to LLM; LLM response returned as-is |
+| `app7.py` — `/submit-key` | Validates the extracted key and reveals the flag |
+| `templates/index.html` | Two attack paths: jailbreak chat (Path 1) and debug endpoint (Path 2) |
+
 ---
 
 ## Step 1 — Open the app
@@ -79,7 +89,7 @@ Flag: flag{Syst3m_Pr0mpt_L3ak3d}
 
 ---
 
-## Bonus — Try the jailbreak path
+## Step 4 — (Optional) Try the jailbreak path
 
 The chat interface (Path 1) is also available. While the LLM is instructed never to reveal the key, you can attempt prompts like:
 
