@@ -117,16 +117,18 @@ def LogoutPage():
 def run_ollama(prompt, model=None):
     if model is None:
         model = os.getenv('PROMPTME_CHAT_MODEL', 'llama3')
-    import subprocess
-    result = subprocess.run(
-        ["ollama", "run", model],
-        input=prompt.encode(),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    if result.returncode != 0:
-        return "Error: LLM call failed."
-    return result.stdout.decode("utf-8").strip()
+    import requests as req
+    ollama_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+    try:
+        response = req.post(
+            f"{ollama_url}/api/generate",
+            json={"model": model, "prompt": prompt, "stream": False},
+            timeout=600
+        )
+        response.raise_for_status()
+        return response.json().get("response", "").strip()
+    except Exception as e:
+        return f"Error: LLM call failed. {e}"
 
 def looks_like_sql(user_input: str) -> bool:
     sql_pattern = r"^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\s+.+"

@@ -1,28 +1,24 @@
-import subprocess
 import re
 import os
+import requests
+
+OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 
 def generate_sql_prompt(natural_language_prompt):
-    return f"""
-You are an expert in converting English questions into SQLite queries.
+    return f"""Convert the English request below into a single SQLite query. Output ONLY the SQL statement, nothing else.
 
-The database has two tables:
+Tables:
 - user(id, username, email_address, password_hash, budget)
 - item(id, name, barcode, price, description, owner)
 
-Convert the following natural language request into a valid SQL query.
-
 Examples:
-- "How many users?" → SELECT COUNT(*) FROM user;
-- "List all products" → SELECT * FROM item;
-- "What tables are present?" → SELECT name FROM sqlite_master WHERE type='table';
-- "Show columns of item" → PRAGMA table_info(item);
-- "Modify the budget of user 'user01' to 10000" -> UPDATE user SET budget = 10000 WHERE username = 'user01';
+"How many users?" → SELECT COUNT(*) FROM user;
+"List all products" → SELECT * FROM item;
+"Modify the budget of alice to 10000" → UPDATE user SET budget = 10000 WHERE username = 'alice';
+"Change the budget of bob to 500" → UPDATE user SET budget = 500 WHERE username = 'bob';
 
-
-ONLY return SQL. No explanations, no markdown.
-Q: {natural_language_prompt}
-A:"""
+Request: {natural_language_prompt}
+SQL:"""
 
 
 
@@ -30,33 +26,43 @@ def extract_sql_from_output(output: str) -> str:
     """
     Extracts the actual SQL query from LLM output.
     """
+    # Strip markdown code fences
     output = re.sub(r"^```sql\s*", "", output, flags=re.IGNORECASE).strip()
+    output = re.sub(r"^```\s*", "", output).strip()
     output = re.sub(r"```$", "", output).strip()
-    
-    # Grab the actual SQL
+
+    # Try to grab SQL up to first semicolon
     match = re.search(r"(SELECT|INSERT|UPDATE|DELETE)[\s\S]+?;", output, re.IGNORECASE)
-    return match.group(0).strip() if match else output.strip()
+    if match:
+        return match.group(0).strip()
+
+    # No semicolon — grab from first SQL keyword to end of first line
+    match = re.search(r"(SELECT|INSERT|UPDATE|DELETE).+", output, re.IGNORECASE)
+    if match:
+        return match.group(0).strip()
+
+    return output.strip()
 
 def query_llm(prompt: str, model=None):
+    """
+    Sends a prompt to the LLM via Ollama HTTP API and extracts + sanitizes the SQL query.
+    """
     if model is None:
         model = os.getenv('PROMPTME_SQL_MODEL', 'sqlcoder')
-    """
-    Sends a prompt to the LLM via Ollama and extracts + sanitizes the SQL query.
-    """
+
     print("🔥 Calling Ollama with prompt:", prompt)
 
-    result = subprocess.run(
-        ["ollama", "run", model],
-        input=prompt.encode(),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-
-    if result.returncode != 0:
-        print("LLM ERROR:", result.stderr.decode("utf-8"))
+    try:
+        response = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            json={"model": model, "prompt": prompt, "stream": False},
+            timeout=600
+        )
+        response.raise_for_status()
+        raw_output = response.json().get("response", "").strip()
+    except Exception as e:
+        print("LLM ERROR:", e)
         return "LLM Error: Model not found or execution failed."
-
-    raw_output = result.stdout.decode("utf-8").strip()
 
     # Extract and sanitize SQL
     sql = extract_sql_from_output(raw_output)
@@ -72,6 +78,21 @@ def sanitize_sql(sql_query: str):
     if "count" in sql_query.lower() and "from" not in sql_query.lower():
         sql_query = re.sub(r"count\((.*?)\)", "count(*)", sql_query, flags=re.IGNORECASE)
 
+    # Remove thousand-separator commas inside numbers (e.g. 10,000 → 10000)
+    sql_query = re.sub(r'(\d),(\d{3})', r'\1\2', sql_query)
+
+    # Fix garbled numeric values in SET clauses (e.g. 1decafe, 1CT000 → extract digits only)
+    def clean_set_value(m):
+        prefix, val = m.group(1), m.group(2)
+        if re.search(r'\d', val) and re.search(r'[a-zA-Z]', val):
+            val = re.sub(r'[^0-9]', '', val)
+        return prefix + val
+    sql_query = re.sub(r'(=\s*)([^\s,;\'\"]+)', clean_set_value, sql_query)
+
+    # Truncate anything after the first semicolon
+    if ";" in sql_query:
+        sql_query = sql_query[:sql_query.index(";") + 1]
+
     return sql_query.strip()
 
 def should_generate_sql(user_message):
@@ -85,7 +106,7 @@ def should_generate_sql(user_message):
     if any(word in message for word in schema_keywords):
         return False
 
-    sql_keywords = ["how many", "count", "total", "select", "items", "users", "prices", "sum", "average", "list", "update", "modify"]
+    sql_keywords = ["how many", "count", "total", "select", "items", "users", "prices", "sum", "average", "list", "update", "modify", "change", "set", "increase", "decrease"]
     return any(keyword in message for keyword in sql_keywords)
 
 
