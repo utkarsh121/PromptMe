@@ -19,7 +19,7 @@
             chatBox.innerHTML += userMessage;
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            fetch("/llm06_2025_chat", {
+            fetch("/chat", {
                 method: "POST",
                 body: JSON.stringify({ message: userInput.value }),
                 headers: { "Content-Type": "application/json" }

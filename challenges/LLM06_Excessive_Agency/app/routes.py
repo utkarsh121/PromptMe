@@ -1,13 +1,13 @@
 from flask import request, render_template
 from app import app
-from app.utils.llm06_2025_utils.llm06_2025_service import process_user_input
+from app.utils.llm06_utils.llm06_service import process_user_input
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
-@app.route('/llm06_2025_chat', methods=['POST'])
+@app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
     user_message = data.get('message', '')

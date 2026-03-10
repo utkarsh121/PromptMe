@@ -1,5 +1,5 @@
-from app.utils.llm06_2025_utils.user_utils import list_users, create_user, init_db
-from app.utils.llm06_2025_utils.llm_utils import query_llm
+from app.utils.llm06_utils.user_utils import list_users, create_user, init_db
+from app.utils.llm06_utils.llm_utils import query_llm
 from flask import jsonify
 import json
 import re
