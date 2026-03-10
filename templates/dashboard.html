@@ -5,255 +5,243 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI Security Lab — OWASP LLM Top 10</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
 <body>
 
-  <!-- Lite / Full mode panel (top-left) -->
-  <div class="mode-panel" id="modePanel">
-    <div class="mode-toggle-row">
-      <span class="mode-label" id="modeLabel">{{ 'Lite Mode' if lite_mode else 'Full Mode' }}</span>
-      <label class="toggle-switch">
-        <input type="checkbox" id="liteToggle" {% if lite_mode %}checked{% endif %}>
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <div class="mode-models-hint" id="modeHint">
-      {{ 'phi3:mini + granite3.1-moe:1b' if lite_mode else 'mistral · llama3 · sqlcoder · granite3-guardian · granite3.1-moe:1b' }}
-    </div>
-    <div class="mode-actions">
-      <button class="mode-btn pull-btn" id="pullBtn" onclick="pullModels()">
-        <i class="fas fa-download"></i> Pull Models
-      </button>
-      <button class="mode-btn remove-btn" id="removeBtn" onclick="removeModels()">
-        <i class="fas fa-trash"></i> Remove Models
-      </button>
-    </div>
-    <div class="pull-log" id="pullLog" style="display:none;"></div>
-  </div>
+<!-- ── Top bar ──────────────────────────────────────────────────── -->
+<div class="top-bar">
+  <div class="top-bar-brand">Prompt<span>Me</span></div>
+  <span class="top-bar-badge">Lite Mode · phi3:mini + granite3.1-moe:1b</span>
+</div>
 
-  <!-- Ollama Status Panel (top-right) -->
-  <div class="ollama-panel" id="ollamaPanel">
-    <div class="ollama-header">
-      <span class="ollama-dot" id="ollamaDot"></span>
-      <span class="ollama-title">Ollama</span>
-      <span class="ollama-status-text" id="ollamaStatusText">checking...</span>
-    </div>
-    <div class="ollama-models" id="ollamaModels"></div>
+<!-- ── Left panel — Pull models ─────────────────────────────────── -->
+<div class="side-panel side-panel-left" id="leftPanel">
+  <div class="panel-title">Models</div>
+  <div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;line-height:1.5;">
+    phi3:mini<br>granite3.1-moe:1b
   </div>
+  <button class="panel-action-btn" id="pullBtn" onclick="pullModels()">
+    <i class="fas fa-download" style="margin-right:5px;"></i> Pull Models
+  </button>
+  <div class="pull-log" id="pullLog" style="display:none;"></div>
+</div>
 
-  <h1>AI Security Lab</h1>
-  <h3>OWASP LLM Top 10 CTF Challenges</h3>
+<!-- ── Right panel — Ollama health ──────────────────────────────── -->
+<div class="side-panel side-panel-right" id="ollamaPanel">
+  <div class="panel-title">Ollama</div>
+  <div class="ollama-header">
+    <span class="ollama-dot" id="ollamaDot"></span>
+    <span style="font-weight:600;font-size:0.82rem;color:var(--text);">Status</span>
+    <span class="ollama-status-text" id="ollamaStatusText">checking…</span>
+  </div>
+  <div class="ollama-models" id="ollamaModels"></div>
+  <button class="panel-action-btn" onclick="restartOllama()">
+    <i class="fas fa-redo" style="margin-right:5px;"></i> Restart Ollama
+  </button>
+</div>
+
+<!-- ── Main content ──────────────────────────────────────────────── -->
+<div class="page-body">
+  <h1 class="page-title">AI Security Lab</h1>
+  <h3 class="page-subtitle">OWASP LLM Top 10 — CTF Challenges</h3>
+
   <div class="tiles-container">
     {% for risk in risks %}
       <div class="tile" id="tile-{{ risk.id }}">
         <div class="running-status" id="status-{{ risk.id }}">Running</div>
-        <i class="{{ risk.icon }}" style="font-size: 36px;"></i>
-        <h3>{{ risk.title }}</h3>
+        <i class="{{ risk.icon }}"></i>
+        <h3>LLM{{ '%02d'|format(risk.id) }}: {{ risk.title }}</h3>
         <div class="tile-buttons">
           <button class="tile-button start" onclick="startChallenge({{ risk.id }})">Start</button>
-          <button class="tile-button stop" onclick="stopChallenge({{ risk.id }})">Stop</button>
+          <button class="tile-button stop"  onclick="stopChallenge({{ risk.id }})">Stop</button>
         </div>
       </div>
     {% endfor %}
   </div>
+</div>
 
-  <script>
-    // ── Challenge start/stop ──────────────────────────────────────────────────
-    function startChallenge(challengeId) {
-      window.open(`/start/${challengeId}`, '_blank');
-      document.getElementById(`status-${challengeId}`).style.display = 'block';
-    }
+<!-- ── Activity bar (bottom) ─────────────────────────────────────── -->
+<div class="activity-bar">
+  <span class="activity-label">Activity</span>
+  <div class="activity-feed" id="activityFeed">
+    <span class="activity-idle">Waiting for LLM activity…</span>
+  </div>
+</div>
 
-    function stopChallenge(challengeId) {
-      fetch(`/stop/${challengeId}`)
-        .then(response => response.text())
-        .then(alert);
-      document.getElementById(`status-${challengeId}`).style.display = 'none';
-    }
+<script>
+  // ── Challenge start/stop ───────────────────────────────────────
+  function startChallenge(id) {
+    window.open(`/start/${id}`, '_blank');
+    document.getElementById(`status-${id}`).style.display = 'block';
+  }
 
-    // ── Lite / Full toggle ────────────────────────────────────────────────────
-    const MODELS_HINT = {
-      lite: 'phi3:mini + granite3.1-moe:1b',
-      full: 'mistral · llama3 · sqlcoder · granite3-guardian · granite3.1-moe:1b'
-    };
+  function stopChallenge(id) {
+    fetch(`/stop/${id}`)
+      .then(r => r.text())
+      .then(msg => {
+        document.getElementById(`status-${id}`).style.display = 'none';
+      });
+  }
 
-    document.getElementById('liteToggle').addEventListener('change', function () {
-      const anyRunning = Object.keys(window._runningIds || {}).length > 0;
-      if (anyRunning) {
-        const ok = confirm(
-          'A challenge is currently running. Switching mode will not affect it until restarted. Continue?'
-        );
-        if (!ok) {
-          this.checked = !this.checked;
+  // ── Ollama status panel ────────────────────────────────────────
+  function fmt(bytes) {
+    if (!bytes) return '';
+    return bytes >= 1e9 ? `${(bytes/1e9).toFixed(1)}G` : `${(bytes/1e6).toFixed(0)}M`;
+  }
+
+  function refreshOllama() {
+    fetch('/ollama/status')
+      .then(r => r.json())
+      .then(data => {
+        const dot  = document.getElementById('ollamaDot');
+        const txt  = document.getElementById('ollamaStatusText');
+        const mdls = document.getElementById('ollamaModels');
+
+        if (!data.running) {
+          dot.className = 'ollama-dot offline';
+          txt.textContent = 'offline';
+          mdls.innerHTML = '';
           return;
         }
-      }
-      fetch('/mode/toggle', { method: 'POST' })
-        .then(r => r.json())
-        .then(data => {
-          const isLite = data.lite;
-          document.getElementById('modeLabel').textContent = isLite ? 'Lite Mode' : 'Full Mode';
-          document.getElementById('modeHint').textContent = isLite ? MODELS_HINT.lite : MODELS_HINT.full;
-          document.getElementById('modePanel').classList.toggle('lite-active', isLite);
-        });
-    });
 
-    // ── Pull models (SSE) ─────────────────────────────────────────────────────
-    function pullModels() {
-      const log = document.getElementById('pullLog');
-      const btn = document.getElementById('pullBtn');
-      log.style.display = 'block';
-      log.innerHTML = '';
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pulling…';
+        dot.className = 'ollama-dot online';
+        txt.textContent = `${data.pulled.length} pulled`;
 
-      const es = new EventSource('/ollama/pull-stream');
-      es.onmessage = (e) => {
-        if (e.data === '__DONE__') {
-          es.close();
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fas fa-download"></i> Pull Models';
-          refreshOllama();
-          return;
-        }
-        let msg;
-        try { msg = JSON.parse(e.data); } catch { return; }
-
-        if (msg.type === 'start') {
-          const safeId = msg.model.replace(/[^a-zA-Z0-9]/g, '_');
-          const row = document.createElement('div');
-          row.className = 'pull-model-row';
-          row.id = `pull-row-${safeId}`;
-          row.innerHTML = `
-            <div class="pull-model-header">
-              <span class="pull-model-name">${msg.model}</span>
-              <span class="pull-model-pct" id="pull-pct-${safeId}">—</span>
-            </div>
-            <div class="pull-model-status" id="pull-status-${safeId}">starting…</div>
-            <div class="pull-bar-wrap">
-              <div class="pull-bar-fill" id="pull-bar-${safeId}" style="width:0%"></div>
-            </div>`;
-          log.appendChild(row);
-
-        } else if (msg.type === 'progress') {
-          const safeId = msg.model.replace(/[^a-zA-Z0-9]/g, '_');
-          const statusEl = document.getElementById(`pull-status-${safeId}`);
-          const barEl    = document.getElementById(`pull-bar-${safeId}`);
-          const pctEl    = document.getElementById(`pull-pct-${safeId}`);
-          if (statusEl) statusEl.textContent = msg.status || '';
-          if (barEl && msg.pct !== null) {
-            barEl.style.width = msg.pct + '%';
-            if (pctEl) pctEl.textContent = msg.pct + '%';
-          }
-
-        } else if (msg.type === 'done') {
-          const safeId = msg.model.replace(/[^a-zA-Z0-9]/g, '_');
-          const barEl    = document.getElementById(`pull-bar-${safeId}`);
-          const pctEl    = document.getElementById(`pull-pct-${safeId}`);
-          const statusEl = document.getElementById(`pull-status-${safeId}`);
-          const row      = document.getElementById(`pull-row-${safeId}`);
-          if (barEl)    barEl.style.width = '100%';
-          if (pctEl)    pctEl.textContent = '100%';
-          if (statusEl) statusEl.textContent = 'done ✓';
-          if (row)      row.classList.add('pull-model-done');
-
-        } else if (msg.type === 'error') {
-          const safeId = msg.model.replace(/[^a-zA-Z0-9]/g, '_');
-          const statusEl = document.getElementById(`pull-status-${safeId}`);
-          const row      = document.getElementById(`pull-row-${safeId}`);
-          if (statusEl) statusEl.textContent = `Error: ${msg.msg}`;
-          if (row)      row.classList.add('pull-model-error');
-        }
-      };
-      es.onerror = () => {
-        es.close();
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-download"></i> Pull Models';
-      };
-    }
-
-    // ── Remove all PromptMe models ────────────────────────────────────────────
-    function removeModels() {
-      if (!confirm('Remove all AI Security Lab models from Ollama? This frees disk space but you will need to pull them again.')) return;
-      const btn = document.getElementById('removeBtn');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removing…';
-      fetch('/ollama/remove-all', { method: 'POST' })
-        .then(r => r.json())
-        .then(results => {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fas fa-trash"></i> Remove Models';
-          const summary = Object.entries(results).map(([m, s]) => `${m}: ${s}`).join('\n');
-          alert('Done:\n' + summary);
-          refreshOllama();
-        });
-    }
-
-    // ── Ollama status panel ───────────────────────────────────────────────────
-    function formatSize(bytes) {
-      if (!bytes) return '';
-      const gb = bytes / 1e9;
-      return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / 1e6).toFixed(0)} MB`;
-    }
-
-    function refreshOllama() {
-      fetch('/ollama/status')
-        .then(r => r.json())
-        .then(data => {
-          const dot = document.getElementById('ollamaDot');
-          const statusText = document.getElementById('ollamaStatusText');
-          const modelsDiv = document.getElementById('ollamaModels');
-
-          if (data.running) {
-            dot.className = 'ollama-dot online';
-            statusText.textContent = `${data.pulled.length} model${data.pulled.length !== 1 ? 's' : ''} pulled`;
-          } else {
-            dot.className = 'ollama-dot offline';
-            statusText.textContent = 'not running';
-            modelsDiv.innerHTML = '';
-            return;
-          }
-
-          modelsDiv.innerHTML = data.pulled.map(m => {
-            const isLoaded = data.loaded_names.includes(m.name);
-            const sizeStr = formatSize(m.size);
-            const badge = isLoaded
-              ? `<span class="model-badge loaded">Loaded</span>`
-              : `<span class="model-badge idle">Idle</span>`;
-            const btn = isLoaded
+        mdls.innerHTML = data.pulled.map(m => {
+          const loaded = data.loaded_names.includes(m.name);
+          return `<div class="model-row">
+            <span class="model-name">${m.name}</span>
+            <span class="model-size">${fmt(m.size)}</span>
+            <span class="model-badge ${loaded ? 'loaded' : 'idle'}">${loaded ? 'loaded' : 'idle'}</span>
+            ${loaded
               ? `<button class="model-btn unload" onclick="unloadModel('${m.name}')">Unload</button>`
-              : `<button class="model-btn load" onclick="loadModel('${m.name}', event)">Load</button>`;
-            return `<div class="model-row">
-              <span class="model-name">${m.name}</span>
-              <span class="model-size">${sizeStr}</span>
-              ${badge}${btn}
-            </div>`;
-          }).join('');
-        })
-        .catch(() => {
-          document.getElementById('ollamaDot').className = 'ollama-dot offline';
-          document.getElementById('ollamaStatusText').textContent = 'not running';
-          document.getElementById('ollamaModels').innerHTML = '';
-        });
-    }
+              : `<button class="model-btn load"   onclick="loadModel('${m.name}', event)">Load</button>`}
+          </div>`;
+        }).join('');
+      })
+      .catch(() => {
+        document.getElementById('ollamaDot').className = 'ollama-dot offline';
+        document.getElementById('ollamaStatusText').textContent = 'offline';
+        document.getElementById('ollamaModels').innerHTML = '';
+      });
+  }
 
-    function unloadModel(name) {
-      fetch(`/ollama/unload/${name}`, { method: 'POST' }).then(() => refreshOllama());
-    }
+  function unloadModel(name) {
+    fetch(`/ollama/unload/${name}`, {method:'POST'}).then(() => refreshOllama());
+  }
 
-    function loadModel(name, e) {
-      const btn = e.target;
-      btn.disabled = true;
-      btn.textContent = 'Loading…';
-      fetch(`/ollama/load/${name}`, { method: 'POST' }).then(() => refreshOllama());
-    }
+  function loadModel(name, e) {
+    e.target.disabled = true; e.target.textContent = '…';
+    fetch(`/ollama/load/${name}`, {method:'POST'}).then(() => refreshOllama());
+  }
 
-    // Init
-    document.getElementById('modePanel').classList.toggle('lite-active', {{ 'true' if lite_mode else 'false' }});
-    refreshOllama();
-    setInterval(refreshOllama, 20000);
-  </script>
+  function restartOllama() {
+    fetch('/ollama/restart', {method:'POST'})
+      .then(r => r.json())
+      .then(d => { if (d.success) setTimeout(refreshOllama, 3000); });
+  }
+
+  // ── Pull models (SSE) ──────────────────────────────────────────
+  function pullModels() {
+    const log = document.getElementById('pullLog');
+    const btn = document.getElementById('pullBtn');
+    log.style.display = 'flex'; log.innerHTML = '';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pulling…';
+
+    const es = new EventSource('/ollama/pull-stream');
+    es.onmessage = e => {
+      if (e.data === '__DONE__') {
+        es.close(); btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-download" style="margin-right:5px;"></i> Pull Models';
+        refreshOllama(); return;
+      }
+      let msg; try { msg = JSON.parse(e.data); } catch { return; }
+
+      const safeId = msg.model.replace(/[^a-zA-Z0-9]/g, '_');
+      if (msg.type === 'start') {
+        const row = document.createElement('div');
+        row.className = 'pull-model-row'; row.id = `pr-${safeId}`;
+        row.innerHTML = `
+          <div class="pull-model-header">
+            <span class="pull-model-name">${msg.model}</span>
+            <span class="pull-model-pct" id="pp-${safeId}">—</span>
+          </div>
+          <div class="pull-model-status" id="ps-${safeId}">starting…</div>
+          <div class="pull-bar-wrap"><div class="pull-bar-fill" id="pb-${safeId}" style="width:0%"></div></div>`;
+        log.appendChild(row);
+
+      } else if (msg.type === 'progress') {
+        const s = document.getElementById(`ps-${safeId}`);
+        const b = document.getElementById(`pb-${safeId}`);
+        const p = document.getElementById(`pp-${safeId}`);
+        if (s) s.textContent = msg.status || '';
+        if (b && msg.pct !== null) { b.style.width = msg.pct + '%'; if (p) p.textContent = msg.pct + '%'; }
+
+      } else if (msg.type === 'done') {
+        const r = document.getElementById(`pr-${safeId}`);
+        const b = document.getElementById(`pb-${safeId}`);
+        const p = document.getElementById(`pp-${safeId}`);
+        const s = document.getElementById(`ps-${safeId}`);
+        if (b) b.style.width = '100%'; if (p) p.textContent = '100%';
+        if (s) s.textContent = 'done ✓'; if (r) r.classList.add('pull-model-done');
+
+      } else if (msg.type === 'error') {
+        const r = document.getElementById(`pr-${safeId}`);
+        const s = document.getElementById(`ps-${safeId}`);
+        if (s) s.textContent = `Error: ${msg.msg}`; if (r) r.classList.add('pull-model-error');
+      }
+    };
+    es.onerror = () => {
+      es.close(); btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-download" style="margin-right:5px;"></i> Pull Models';
+    };
+  }
+
+  // ── Activity feed (SSE) ────────────────────────────────────────
+  const MAX_EVENTS = 8;
+  const feedEl = document.getElementById('activityFeed');
+  let events = [];
+  let idleShown = true;
+
+  function renderFeed() {
+    if (events.length === 0) {
+      feedEl.innerHTML = '<span class="activity-idle">Waiting for LLM activity…</span>';
+      idleShown = true;
+      return;
+    }
+    idleShown = false;
+    feedEl.innerHTML = events.slice(-MAX_EVENTS).map(ev => {
+      let cls = '';
+      if (ev.event === 'start') cls = 'ev-start';
+      else if (ev.event === 'done') cls = 'ev-done';
+      else if (ev.event === 'ollama_restart') cls = 'ev-restart';
+
+      let label = '';
+      if (ev.event === 'start')          label = `[${ev.lab || ev.port || '?'}] ⟳ query started`;
+      else if (ev.event === 'done')      label = `[${ev.lab || ev.port || '?'}] ✓ ${ev.elapsed ? ev.elapsed.toFixed(0)+'s' : ''} ${ev.words ? ev.words+' words' : ''}`;
+      else if (ev.event === 'ollama_restart') label = `[System] Ollama restarted`;
+      else label = `[${ev.lab || '?'}] ${ev.event}`;
+
+      return `<span class="activity-event ${cls}">${ev.ts ? ev.ts+' ' : ''}${label}</span>`;
+    }).join('');
+  }
+
+  const evtSource = new EventSource('/events/activity');
+  evtSource.onmessage = e => {
+    try {
+      const ev = JSON.parse(e.data);
+      events.push(ev);
+      if (events.length > 40) events.shift();
+      renderFeed();
+    } catch {}
+  };
+  evtSource.onerror = () => {};
+
+  // ── Init ───────────────────────────────────────────────────────
+  refreshOllama();
+  setInterval(refreshOllama, 15000);
+</script>
 </body>
 </html>

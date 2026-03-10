@@ -1,9 +1,17 @@
 from flask import Flask, render_template, request
 from langchain_ollama import ChatOllama
 import os
+import requests as _requests
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 import time
+
+def _ping(event, **kw):
+    try:
+        _requests.post("http://localhost:5000/internal/llm-event",
+                       json={"lab": "LLM10", "port": 5010, "event": event, **kw}, timeout=1)
+    except Exception:
+        pass
 
 app = Flask(__name__)
 model = ChatOllama(model=os.getenv('PROMPTME_CHAT_MODEL', 'mistral'), base_url="http://localhost:11434/")
@@ -22,12 +30,14 @@ def generate_response(user_input):
     chat_template = ChatPromptTemplate.from_messages(chat_history)
     chain = chat_template | model | StrOutputParser()
 
+    _ping("start", model=os.getenv('PROMPTME_CHAT_MODEL', 'phi3:mini'))
     start = time.time()
     try:
         response = chain.invoke({})
     except Exception as e:
         response = f"[!] Error while generating response: {str(e)}"
     end = time.time()
+    _ping("done", elapsed=round(end-start, 1), words=len(response.split()))
 
     elapsed = end - start
     return response, elapsed

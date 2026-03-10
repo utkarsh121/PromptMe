@@ -1,39 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>LLM01: Prompt Injection</title>
-
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM01: Prompt Injection</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h2>AI Security Lab</h2>
-        <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
 
-        <div class="chat-history">
-            {% for msg in chat_history %}
-                <div class="message {{ msg.role }}">
-                    <strong>{{ msg.role.capitalize() }}:</strong> 
-                    {% if 'FLAG:' in msg.content %}
-                        {{ msg.content.split('FLAG:')[0] }}
-                        <span class="flag">FLAG: {{ msg.content.split('FLAG:')[1] | safe }}</span>
-                    {% else %}
-                        {{ msg.content }}
-                    {% endif %}
-                </div>
-            {% endfor %}
+<header class="lab-header">
+  <span class="lab-badge">LLM01</span>
+  <h1>Prompt Injection — Chat</h1>
+  <a href="http://127.0.0.1:5000" class="back-link">← Dashboard</a>
+</header>
+
+<main class="lab-main">
+  <div class="container">
+    <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
+
+    <div class="chat-history">
+      {% for msg in chat_history %}
+        <div class="message {{ msg.role }}">
+          <strong>{{ msg.role.capitalize() }}:</strong>
+          {% if 'FLAG:' in msg.content %}
+            {{ msg.content.split('FLAG:')[0] }}<span class="flag">FLAG: {{ msg.content.split('FLAG:')[1] | safe }}</span>
+          {% else %}
+            {{ msg.content }}
+          {% endif %}
         </div>
-        
-
-        <form class="chat-form" method="POST">
-            <textarea name="message" rows="3" placeholder="Type your message..." required></textarea>
-            <button type="submit" class="send-btn">Send</button>
-        </form>
-        <p></p>
-        <li> Use <code>/fetch https://example.com</code> to get a summary of a web page </li>
-
-        
+      {% endfor %}
     </div>
+
+    <form class="chat-form" method="POST">
+      <textarea name="message" rows="3" placeholder="Type your message…" required></textarea>
+      <button type="submit" class="send-btn">Send</button>
+    </form>
+
+    <p class="hint">Tip: use <code>/fetch https://example.com</code> to fetch and summarise a web page.</p>
+  </div>
+</main>
+
 </body>
 </html>

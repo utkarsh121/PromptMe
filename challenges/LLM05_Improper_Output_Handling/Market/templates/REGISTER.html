@@ -1,33 +1,34 @@
 {% extends "base.html" %}
 {% block body %}
-<body class="text-center">
-    <div class="container">
-        <form method="post" class="form-register">
-            {{ form.hidden_tag() }}
-            <h1>Account | Register</h1>
-            
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                <div>
-                  {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message|safe }}</div>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            {% endwith %}
-            
-            <br>{{ form.username(class="form-control", placeholder="Username..") }}
-            <br>{{ form.email_address(class="form-control", placeholder="Email Address..") }}
-            <br>{{ form.password1(class="form-control", placeholder="Password..") }}
-            <br>{{ form.password2(class="form-control", placeholder="Confirm Password..") }}
-            <br>
-            <div class="checkbox mb-3">
-                <h6>Already have an account?
-                    <a class="btn btn-sm btn-outline-warning btn-secondary" href="{{ url_for('LoginPage') }}">Sign In</a>
-                </h6>
-            </div>
-            {{ form.submit(class="btn btn-lg btn-outline-warning") }}
-        </form>
-    </div>
-</body>
+<div class="lab-main" style="max-width:480px;">
+  <div class="container">
+    <h1>Register</h1>
+    <form method="post">
+      {{ form.hidden_tag() }}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for cat, msg in messages %}<div class="flash-message {{ cat }}">{{ msg | safe }}</div>{% endfor %}{% endif %}
+      {% endwith %}
+      <div class="form-group">
+        <label>Username</label>
+        {{ form.username(placeholder="Choose a username…") }}
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        {{ form.email_address(placeholder="Email address…") }}
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        {{ form.password1(placeholder="Password…") }}
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        {{ form.password2(placeholder="Confirm password…") }}
+      </div>
+      <p style="margin-bottom:1rem;font-size:0.85rem;color:var(--muted);">
+        Already have an account? <a href="{{ url_for('LoginPage') }}" style="color:var(--accent);">Sign in</a>
+      </p>
+      {{ form.submit(class="btn") }}
+    </form>
+  </div>
+</div>
 {% endblock %}

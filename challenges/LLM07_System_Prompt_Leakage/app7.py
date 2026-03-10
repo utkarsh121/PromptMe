@@ -1,12 +1,21 @@
 from flask import Flask, render_template, request, jsonify
 from langchain_ollama import ChatOllama
 import os
+import time
+import requests as _requests
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import (
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
     ChatPromptTemplate
 )
+
+def _ping(event, **kw):
+    try:
+        _requests.post("http://localhost:5000/internal/llm-event",
+                       json={"lab": "LLM07", "port": 5007, "event": event, **kw}, timeout=1)
+    except Exception:
+        pass
 
 app = Flask(__name__)
 model = ChatOllama(model=os.getenv('PROMPTME_CHAT_MODEL', 'mistral'), base_url="http://localhost:11434/")
@@ -24,7 +33,11 @@ def generate_response(user_input):
     chat_history = [system_message, prompt]
     chat_template = ChatPromptTemplate.from_messages(chat_history)
     chain = chat_template | model | StrOutputParser()
-    return chain.invoke({})
+    _ping("start", model=os.getenv('PROMPTME_CHAT_MODEL', 'phi3:mini'))
+    t0 = time.time()
+    result = chain.invoke({})
+    _ping("done", elapsed=round(time.time()-t0, 1), words=len(result.split()))
+    return result
 
 @app.route("/", methods=["GET"])
 def index():

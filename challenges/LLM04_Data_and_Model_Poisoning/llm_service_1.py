@@ -2,6 +2,13 @@ import csv, os
 import time
 import requests
 import random
+
+def _ping(event, **kw):
+    try:
+        requests.post("http://localhost:5000/internal/llm-event",
+                      json={"lab": "LLM04", "port": 5004, "event": event, **kw}, timeout=1)
+    except Exception:
+        pass
 from io import StringIO
 from datetime import datetime, timezone
 
@@ -120,8 +127,11 @@ def get_answer(question: str) -> str:
         context=f"Q: {matched_q}\nA: {matched_a}\nNonce: {nonce}"
     )
 
+    _ping("start", model=os.getenv('PROMPTME_CHAT_MODEL', 'phi3:mini'))
+    t0 = time.time()
     response = model.invoke(filled_prompt)
     answer = response.content if isinstance(response, AIMessage) else str(response)
+    _ping("done", elapsed=round(time.time()-t0, 1), words=len(answer.split()))
 
     # Only run tamper check if question is about the Top 10
     if matched_q.strip().lower() == "list top 10 llm vulnerabilities":

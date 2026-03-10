@@ -1,20 +1,26 @@
 {% extends "base.html" %}
 {% block body %}
-    <body class="text-center">
-        <div class="container">
-            <form method="post" class="form-login">
-                {{ form.hidden_tag() }}
-                <h1>Account | Login</h1>
-                <br>{{ form.username(class="form-control", placeholder="Username..") }}
-                <br>{{ form.password(class="form-control", placeholder="Password..") }}
-                <br>
-                <div class="checkbox mb-3">
-                    <h6>Don't have an account?
-                        <a class="btn btn-sm btn-outline-warning btn-secondary" href="{{ url_for('RegisterPage') }}">Create Account</a>
-                    </h6>
-                </div>
-                {{ form.submit(class="btn btn-lg btn-outline-warning") }}
-            </form>
-        </div>
-    </body>
+<div class="lab-main" style="max-width:420px;">
+  <div class="container">
+    <h1>Login</h1>
+    <form method="post">
+      {{ form.hidden_tag() }}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for cat, msg in messages %}<div class="flash-message">{{ msg }}</div>{% endfor %}{% endif %}
+      {% endwith %}
+      <div class="form-group">
+        <label>Username</label>
+        {{ form.username(placeholder="Username…") }}
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        {{ form.password(placeholder="Password…") }}
+      </div>
+      <p style="margin-bottom:1rem;font-size:0.85rem;color:var(--muted);">
+        Don't have an account? <a href="{{ url_for('RegisterPage') }}" style="color:var(--accent);">Register</a>
+      </p>
+      {{ form.submit(class="btn") }}
+    </form>
+  </div>
+</div>
 {% endblock %}

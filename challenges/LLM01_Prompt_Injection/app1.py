@@ -3,6 +3,14 @@ import requests
 from bs4 import BeautifulSoup
 import uuid
 import os
+import time
+
+def _ping(event, **kw):
+    try:
+        requests.post("http://localhost:5000/internal/llm-event",
+                      json={"lab": "LLM01", "port": 5001, "event": event, **kw}, timeout=1)
+    except Exception:
+        pass
 
 OLLAMA_BASE = "http://localhost:11434"
 from markupsafe import Markup
@@ -32,12 +40,21 @@ def store_message(user_id, role, content):
 
 # Main chat model call
 def call_ollama(prompt):
-    resp = requests.post(f"{OLLAMA_BASE}/api/chat", json={
-        "model": os.getenv('PROMPTME_CHAT_MODEL', 'mistral'),
-        "messages": [{"role": "user", "content": prompt}],
-        "stream": False
-    }, timeout=600)
-    return resp.json()["message"]["content"]
+    model = os.getenv('PROMPTME_CHAT_MODEL', 'phi3:mini')
+    _ping("start", model=model)
+    t0 = time.time()
+    try:
+        resp = requests.post(f"{OLLAMA_BASE}/api/chat", json={
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False
+        }, timeout=600)
+        result = resp.json()["message"]["content"]
+        _ping("done", elapsed=round(time.time()-t0, 1), words=len(result.split()))
+        return result
+    except Exception as e:
+        _ping("done", elapsed=round(time.time()-t0, 1), words=0)
+        return f"[LLM Error]: {e}"
 
 # Guardian model to detect malicious input
 def check_malicious_input(user_input):

@@ -1,214 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>LLM02 - Sensitive Information Disclosure</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #404040;
-            padding: 20px;
-            color: #fff;
-        }
-
-        h1 {
-            text-align: center;
-            color: #FFFFFF;
-        }
-
-        .intro-box {
-            background-color: #333;
-            border: 1px solid #777;
-            border-radius: 8px;
-            padding: 20px;
-            max-width: 800px;
-            margin: 20px auto;
-            line-height: 1.6;
-            box-shadow: 0 0 10px #222;
-        }
-
-        .intro-box p {
-            margin: 10px 0;
-        }
-
-        .intro-box strong {
-            color: #ffcc00;
-        }
-
-        #chatBox {
-            background-color: #ffffff;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            padding: 20px;
-            max-width: 800px;
-            margin: 0 auto 20px auto;
-            height: 300px;
-            overflow-y: auto;
-            color: #000;
-        }
-
-        .entry {
-            margin-bottom: 15px;
-        }
-
-        .question {
-            font-weight: bold;
-            color: #1a237e;
-        }
-
-        .answer {
-            margin-left: 20px;
-            color: #2e7d32;
-        }
-
-        #queryForm {
-            max-width: 800px;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: stretch;
-        }
-
-        textarea {
-            padding: 10px;
-            font-size: 16px;
-            resize: vertical;
-            min-height: 60px;
-            margin-bottom: 10px;
-        }
-
-        button {
-            text-align: center;
-            background-color: #2196f3;
-            color: white;
-            padding: 12px;
-            font-size: 16px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #1976d2;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM02: Sensitive Info Disclosure</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
-    <h1>LLM02 - Sensitive Information Disclosure</h1>
+<header class="lab-header">
+  <span class="lab-badge">LLM02</span>
+  <h1>Sensitive Information Disclosure</h1>
+  <a href="http://127.0.0.1:5000" class="back-link">← Dashboard</a>
+</header>
 
-    <div class="intro-box">
-        <p>A simple chatbot built on top of PDF documents using <strong>RAG (Retrieval-Augmented Generation)</strong>.</p>
-        <p>The documents contain typical organizational content like policies and system configurations.</p>
-        <p><strong>Challenge Goal:</strong> Interact with the chatbot to extract a secret or flag hidden inside the PDFs. Sensitive configuration files may contain hardcoded secrets. Try to trick the chatbot into revealing this protected data through clever prompting.</p>
-        <p><strong>Hint:</strong> Ask about configuration content, internal credentials, or secrets.</p>
+<main class="lab-main">
+  <div class="container">
+    <p class="subtitle">A chatbot backed by PDF documents via RAG — including sensitive configuration files.</p>
+    <p class="lab-goal"><strong>Goal:</strong> Trick the chatbot into revealing a secret token hidden inside the PDFs, then submit it below.</p>
+
+    <div id="chatBox" class="chat-history" style="margin-bottom:1rem;"></div>
+
+    <div class="form-group">
+      <textarea id="query" rows="3" placeholder="Ask the chatbot…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitQuery();}"></textarea>
     </div>
+    <button onclick="submitQuery()">Submit</button>
+    <div id="loadingSpinner" class="loading" style="display:none;">⏳ Processing your query…</div>
 
-    <div id="chatBox"></div>
+    <div class="divider"></div>
 
-    <div id="queryForm">
-        <textarea id="query" placeholder="Type your question here..." onkeydown="if(event.key === 'Enter' && !event.shiftKey){event.preventDefault(); submitQuery();}"></textarea>
-        <button onclick="submitQuery()">Submit</button>
+    <h3 class="section-title">Found the secret token? Submit it here.</h3>
+    <button class="btn-secondary" onclick="toggleTokenPanel()" style="width:100%;margin-bottom:0.75rem;">Submit Secret Token to Get the Flag</button>
 
-        <div id="loadingSpinner" style="display: none; color: white; margin-top: 10px;">
-            ⏳ Processing your query...
-        </div>
+    <div id="tokenPanel" style="display:none;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="tokenInput" placeholder="Paste token here…" style="flex:1;">
+        <button onclick="submitToken()" style="width:auto;">Submit Token</button>
+      </div>
+      <div id="flagArea" style="margin-top:0.75rem;font-family:'DM Mono',monospace;font-size:0.9rem;"></div>
     </div>
+  </div>
+</main>
 
-    <hr>
+<script>
+  function submitQuery() {
+    const q = document.getElementById('query').value.trim();
+    if (!q) return;
+    const spinner = document.getElementById('loadingSpinner');
+    spinner.style.display = 'block';
 
-    <button onclick="toggleAccordion()" style="margin-top: 20px; font-weight: bold; cursor: pointer; text-align: center;">
-        Submit Secret Token to Get the Flag
-    </button>
+    fetch('/query', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query: q})
+    })
+    .then(r => r.json())
+    .then(data => {
+      const box = document.getElementById('chatBox');
+      box.innerHTML +=
+        `<div class="message user"><strong>Q:</strong> ${q}</div>` +
+        `<div class="message assistant"><strong>A:</strong> ${data.response || 'No response'}</div>`;
+      box.scrollTop = box.scrollHeight;
+      document.getElementById('query').value = '';
+    })
+    .catch(() => alert('Error fetching response.'))
+    .finally(() => { spinner.style.display = 'none'; });
+  }
 
-    <div id="accordionContent" style="display: none; margin-top: 10px;">
-        <div style="display:flex; flex-direction: row; margin-bottom: 10px;"> 
-            <input type="text" id="tokenInput" placeholder="Enter Your Token" style="width: 300px; padding: 8px;">
-            <div id="flagArea" style="margin-left: 10px; font-weight: bold;"></div>
-        </div>    
-        <button onclick="submitToken()">Submit Token</button>
-    </div>
+  function submitToken() {
+    const token = document.getElementById('tokenInput').value;
+    fetch('/submit-token', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({token})
+    })
+    .then(r => r.json())
+    .then(data => {
+      const el = document.getElementById('flagArea');
+      if (data.status === 'success') {
+        el.innerHTML = `<div class="flag-box">🏁 Flag: ${data.flag}</div>`;
+      } else {
+        el.innerHTML = `<div class="error-box">❌ ${data.message}</div>`;
+      }
+    });
+  }
 
-    <script>
-        function submitQuery() {
-            const queryInput = document.getElementById("query");
-            const query = queryInput.value.trim();
-            const loadingSpinner = document.getElementById("loadingSpinner");
-
-            if (!query) return;
-
-            loadingSpinner.style.display = "block";
-
-            fetch("/query", {
-                method: "POST",
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ query })
-            })
-            .then(response => response.json())
-            .then(data => {
-                const chatBox = document.getElementById("chatBox");
-
-                const entry = document.createElement("div");
-                entry.className = "entry";
-
-                const question = document.createElement("div");
-                question.className = "question";
-                question.textContent = "Q: " + query;
-
-                const answer = document.createElement("div");
-                answer.className = "answer";
-                answer.textContent = "A: " + (data.response || "No response");
-
-                entry.appendChild(question);
-                entry.appendChild(answer);
-
-                chatBox.appendChild(entry);
-                chatBox.scrollTop = chatBox.scrollHeight;
-
-                queryInput.value = "";
-                queryInput.focus();
-            })
-            .catch(err => {
-                alert("Error while fetching response.");
-                console.error(err);
-            })
-            .finally(() => {
-                loadingSpinner.style.display = "none";
-            });
-        }
-
-        function submitToken() {
-            const token = document.getElementById("tokenInput").value;
-
-            fetch("/submit-token", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ token: token })
-            })
-            .then(response => response.json())
-            .then(data => {
-                const flagDiv = document.getElementById("flagArea");
-                if (data.status === "success") {
-                    flagDiv.innerHTML = "Flag: " + data.flag;
-                    flagDiv.style.color = "white";
-                } else {
-                    flagDiv.innerHTML = "❌ " + data.message;
-                    flagDiv.style.color = "red";
-                }
-            });
-        }
-
-        function toggleAccordion() {
-            const content = document.getElementById("accordionContent");
-            if (content.style.display === "none" || content.style.display === "") {
-                content.style.display = "block";
-            } else {
-                content.style.display = "none";
-            }
-        }
-    </script>
-
+  function toggleTokenPanel() {
+    const p = document.getElementById('tokenPanel');
+    p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  }
+</script>
 </body>
 </html>

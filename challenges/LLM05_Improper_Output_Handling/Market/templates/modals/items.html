@@ -1,50 +1,36 @@
-<div class="modal fade" id="Info-{{ item.id }}" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content" style="background-color: #212121;">
-            <div class="modal-header">
-                <h5 class="modal-title" id="ModalLabel"><strong>{{ item.name }}</strong></h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <strong>Barcode:</strong> {{ item.barcode }}
-                <br><strong>Price:</strong> {{ item.prettier_price }}
-                <br><strong>Description:</strong> {{ item.description }}
-                {% if item.owned_user.username %}
-                <br><strong>Owner:</strong> {{ item.owned_user.username }}
-                {% endif %}
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-close-white" data-dismiss="modal">Close
-                </button>
-            </div>
-        </div>
+<!-- Info modal -->
+<div class="modal-overlay" id="modal-info-{{ item.id }}">
+  <div class="modal-box">
+    <h3>{{ item.name }}</h3>
+    <div class="modal-body">
+      <strong>Barcode:</strong> {{ item.barcode }}<br>
+      <strong>Price:</strong> {{ item.prettier_price }}<br>
+      <strong>Description:</strong> {{ item.description }}<br>
+      {% if item.owned_user.username %}
+      <strong>Owner:</strong> {{ item.owned_user.username }}
+      {% endif %}
     </div>
+    <div class="modal-footer-btns">
+      <button class="btn-secondary btn-sm" onclick="closeModal('modal-info-{{ item.id }}')">Close</button>
+    </div>
+  </div>
 </div>
 
-<div class="modal fade" id="Buy-{{ item.id }}" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content" style="background-color: #212121;">
-            <div class="modal-header">
-                <h5 class="modal-title" id="ModalLabel"><strong>{{ item.name }}</strong></h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form method="POST">
-                    {{ purchase_form.hidden_tag() }}
-                    <p class="text-capitalize">Hey, {{current_user.username}}!</p>
-                    <p>Are you sure you want to buy <strong>{{ item.name }}</strong> for <strong>{{ item.prettier_price }}</strong> ?</p>
-                    <div class="modal-footer">
-                        <input id="purchased_item" name="purchased_item" type="hidden" value="{{item.name}}">
-                        {{ purchase_form.submit(class="btn btn-outline-success btn-block") }}
-                        <button type="button" class="btn btn-secondary btn-close-white" data-dismiss="modal">Close
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+<!-- Buy modal -->
+<div class="modal-overlay" id="modal-buy-{{ item.id }}">
+  <div class="modal-box">
+    <h3>{{ item.name }}</h3>
+    <form method="POST">
+      {{ purchase_form.hidden_tag() }}
+      <div class="modal-body">
+        Hey, <strong>{{ current_user.username }}</strong>!<br>
+        Are you sure you want to buy <strong>{{ item.name }}</strong> for <strong>{{ item.prettier_price }}</strong>?
+      </div>
+      <input id="purchased_item" name="purchased_item" type="hidden" value="{{ item.name }}">
+      <div class="modal-footer-btns">
+        {{ purchase_form.submit(class="btn btn-success btn-sm") }}
+        <button type="button" class="btn-secondary btn-sm" onclick="closeModal('modal-buy-{{ item.id }}')">Cancel</button>
+      </div>
+    </form>
+  </div>
 </div>

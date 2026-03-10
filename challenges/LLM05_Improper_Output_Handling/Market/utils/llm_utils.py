@@ -1,8 +1,16 @@
 import re
 import os
 import requests
+import time
 
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+
+def _ping(event, **kw):
+    try:
+        requests.post("http://localhost:5000/internal/llm-event",
+                      json={"lab": "LLM05", "port": 5005, "event": event, **kw}, timeout=1)
+    except Exception:
+        pass
 
 def generate_sql_prompt(natural_language_prompt):
     return f"""Convert the English request below into a single SQLite query. Output ONLY the SQL statement, nothing else.
@@ -51,6 +59,8 @@ def query_llm(prompt: str, model=None):
         model = os.getenv('PROMPTME_SQL_MODEL', 'sqlcoder')
 
     print("🔥 Calling Ollama with prompt:", prompt)
+    _ping("start", model=model)
+    t0 = time.time()
 
     try:
         response = requests.post(
@@ -60,7 +70,9 @@ def query_llm(prompt: str, model=None):
         )
         response.raise_for_status()
         raw_output = response.json().get("response", "").strip()
+        _ping("done", elapsed=round(time.time()-t0, 1), words=len(raw_output.split()))
     except Exception as e:
+        _ping("done", elapsed=round(time.time()-t0, 1), words=0)
         print("LLM ERROR:", e)
         return "LLM Error: Model not found or execution failed."
 

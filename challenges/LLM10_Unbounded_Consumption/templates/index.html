@@ -1,46 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>LLM10: Unbounded Consumption</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script>
-        function showLoading() {
-            document.getElementById("loading").style.display = "block";
-        }
-    </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM10: Unbounded Consumption</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script>function showLoading() { document.getElementById('loading').style.display = 'block'; }</script>
 </head>
 <body>
-    <div class="container">
-        <h1>LLM10: Unbounded Consumption</h1>
-        <p class="subtitle">The application is a classic Chatbox with no additional restrictions/addons.</p>
-        <p class="subtitle">Goal: Use creative prompts to perform DoS</p>
 
-        <form method="POST" action="/ask" onsubmit="showLoading()">
-            <textarea name="message" placeholder="Type your message..." required></textarea>
-            <button type="submit">Submit</button>
-        </form>
+<header class="lab-header">
+  <span class="lab-badge">LLM10</span>
+  <h1>Unbounded Consumption</h1>
+  <a href="http://127.0.0.1:5000" class="back-link">← Dashboard</a>
+</header>
 
-        <div id="loading" class="loading" style="display: none;">⏳ Please wait, thinking hard...</div>
+<main class="lab-main">
+  <div class="container">
+    <p class="subtitle">A chatbot with no rate limiting, no input length restriction, and no output cap.</p>
+    <p class="lab-goal"><strong>Goal:</strong> Craft a prompt that causes the LLM to take &gt;90 seconds and return &gt;400 words — simulating a denial-of-service condition.</p>
 
-        {% if user_input %}
-        <div class="history">
-            <div class="message user"><strong>🧑 User:</strong> {{ user_input }}</div>
-            <div class="message ai">
-                <strong>🤖 Assistant:</strong>
-                <pre class="response-text">{{ response_text | safe }}</pre>
-            </div>
-        </div>
-        {% endif %}
+    <form method="POST" action="/ask" onsubmit="showLoading()">
+      <textarea name="message" placeholder="Type a resource-intensive prompt…" required></textarea>
+      <button type="submit" style="margin-top:0.75rem;">Submit</button>
+    </form>
+
+    <div id="loading" class="loading" style="display:none;">⏳ Please wait, thinking hard…</div>
+
+    {% if user_input %}
+    <div class="history">
+      <div class="message user"><strong>You:</strong> {{ user_input }}</div>
+      <div class="message ai">
+        <strong>Assistant:</strong>
+        <pre style="white-space:pre-wrap;word-wrap:break-word;margin-top:0.5rem;font-family:'DM Sans',sans-serif;font-size:0.88rem;">{{ response_text | safe }}</pre>
+      </div>
     </div>
-
-    <style>
-        .response-text {
-            white-space: pre-wrap; /* Ensure text wraps properly */
-            word-wrap: break-word; /* Prevent overflow */
-            overflow-x: auto; /* Allow horizontal scroll if necessary */
-        }
-    </style>
+    {% endif %}
+  </div>
+</main>
 
 </body>
 </html>

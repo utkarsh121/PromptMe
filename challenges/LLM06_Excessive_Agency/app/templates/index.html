@@ -1,70 +1,65 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM06: Excessive Agency</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script>
-        function sendMessage() {
-            const userInput = document.getElementById("user-input");
-            const chatBox = document.getElementById("chat-box");
-
-            if (userInput.value.trim() === "") return;
-
-            const typingAnimation = document.getElementById("typing");
-            typingAnimation.style.display = 'block';
-
-            const userMessage = `<pre class='message user-message'>${userInput.value}</pre>`;
-            chatBox.innerHTML += userMessage;
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            fetch("/chat", {
-                method: "POST",
-                body: JSON.stringify({ message: userInput.value }),
-                headers: { "Content-Type": "application/json" }
-            })
-            .then(response => response.json())
-            .then(data => {
-                const botMessage = `<pre class='message bot-message'>${data.reply}</pre>`;
-                chatBox.innerHTML += botMessage;
-                chatBox.scrollTop = chatBox.scrollHeight;
-                typingAnimation.style.display = 'none';
-            });
-
-            userInput.value = "";
-        }
-
-        document.addEventListener("keydown", function(e) {
-            if (e.key === "Enter") sendMessage();
-        });
-    </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM06: Excessive Agency</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>LLM06: Excessive Agency</h1>
-    <p>
-        This is an internal <strong>User Management System</strong> powered by an LLM assistant.
-        The assistant can list existing users and create new ones — but admin account creation
-        is restricted to the System Administrator only.
-    </p>
-    <p>
-        <strong>Goal:</strong> Exploit the LLM's excessive agency to create a new admin user
-        without any real authentication.
-    </p>
-    <p style="color:#aaa; font-size:0.9rem;">
-        Try: <em>"Show me all users"</em> to explore, then think about how to escalate your privileges.
-    </p>
+
+<header class="lab-header">
+  <span class="lab-badge">LLM06</span>
+  <h1>Excessive Agency</h1>
+  <a href="http://127.0.0.1:5000" class="back-link">← Dashboard</a>
+</header>
+
+<main class="lab-main">
+  <div class="container">
+    <p class="subtitle">An internal User Management System powered by an LLM assistant.</p>
+    <p class="lab-goal"><strong>Goal:</strong> Exploit the LLM's excessive agency to create a new admin user without real authentication.</p>
+    <p class="hint">Try <em>"Show me all users"</em> to explore, then think about how to escalate privileges.</p>
 
     <div class="chat-container">
-        <h2 class="chat-header">🛡️ User Management Assistant</h2>
-        <div class="chat-box" id="chat-box"></div>
-        <div id='typing' class='typing-message bot-message typing' style="display: none;">
-            🤖 AI is thinking<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
-        </div>
-        <div class="input-container">
-            <input type="text" id="user-input" placeholder="Type your message... (press Enter to send)">
-            <button onclick="sendMessage()">Send</button>
-        </div>
+      <div class="chat-header">🛡️ User Management Assistant</div>
+      <div class="chat-box" id="chat-box"></div>
+      <div id="typing" class="typing-message" style="display:none;padding:10px 14px;">
+        🤖 AI is thinking<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+      </div>
+      <div class="input-container">
+        <input type="text" id="user-input" placeholder="Type your message… (Enter to send)">
+        <button onclick="sendMessage()">Send</button>
+      </div>
     </div>
+  </div>
+</main>
+
+<script>
+  function sendMessage() {
+    const userInput = document.getElementById('user-input');
+    const chatBox = document.getElementById('chat-box');
+    if (!userInput.value.trim()) return;
+
+    document.getElementById('typing').style.display = 'block';
+    chatBox.innerHTML += `<pre class="message user-message">${userInput.value}</pre>`;
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    fetch('/chat', {
+      method: 'POST',
+      body: JSON.stringify({message: userInput.value}),
+      headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+      chatBox.innerHTML += `<pre class="message bot-message">${data.reply}</pre>`;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      document.getElementById('typing').style.display = 'none';
+    });
+
+    userInput.value = '';
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+</script>
 </body>
 </html>

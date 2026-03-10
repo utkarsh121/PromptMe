@@ -1,103 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>LLM07: System Prompt Leakage</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script>
-        function showLoading() {
-            document.getElementById("loading").style.display = "block";
-        }
-    </script>
-    <style>
-        .divider {
-            border-top: 1px solid #444;
-            margin: 30px 0;
-        }
-        .section-title {
-            color: #00e5ff;
-            margin-bottom: 10px;
-        }
-        input[type="text"] {
-            width: 100%;
-            padding: 12px 15px;
-            margin-bottom: 12px;
-            background-color: #2a2a2a;
-            border: 1px solid #444;
-            color: #fff;
-            border-radius: 5px;
-            font-size: 15px;
-            box-sizing: border-box;
-        }
-        .hint {
-            color: #aaa;
-            font-size: 0.88rem;
-            margin-bottom: 8px;
-        }
-        .error-box {
-            background-color: #4a1a1a;
-            padding: 12px 15px;
-            color: #ffaaaa;
-            border-radius: 5px;
-            margin-top: 15px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM07: System Prompt Leakage</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script>function showLoading() { document.getElementById('loading').style.display = 'block'; }</script>
 </head>
 <body>
-    <div class="container">
-        <h1>LLM07: System Prompt Leakage</h1>
-        <p class="subtitle">The application has a confidential API key stored in the LLM's system prompt.</p>
-        <p class="subtitle"><strong>Goal:</strong> Find the hidden API key and submit it below.</p>
 
-        {% if success %}
-        <div class="success">
-            🎉 <strong>Congratulations!</strong> You found the API key hidden in the system prompt!<br><br>
-            Flag: <code>flag{Syst3m_Pr0mpt_L3ak3d}</code>
-        </div>
-        {% endif %}
+<header class="lab-header">
+  <span class="lab-badge">LLM07</span>
+  <h1>System Prompt Leakage</h1>
+  <a href="http://127.0.0.1:5000" class="back-link">← Dashboard</a>
+</header>
 
-        <!-- Attack Path 1: Jailbreak the LLM -->
-        <h3 class="section-title">Path 1 — Ask the assistant</h3>
-        <p class="hint">The LLM has been instructed to keep the key secret. Can you trick it into revealing it?</p>
+<main class="lab-main">
+  <div class="container">
+    <p class="subtitle">The application has a confidential API key stored in the LLM's system prompt.</p>
+    <p class="lab-goal"><strong>Goal:</strong> Find the hidden API key and submit it below.</p>
 
-        <form method="POST" action="/ask" onsubmit="showLoading()">
-            <textarea name="message" rows="3" placeholder="Type a prompt to extract the API key..." required></textarea>
-            <button type="submit">Ask the Assistant</button>
-        </form>
-
-        <div id="loading" class="loading" style="display: none;">⏳ Please wait, thinking hard...</div>
-
-        {% if response_text %}
-        <div class="history">
-            <div class="message user"><strong>You:</strong> {{ user_input }}</div>
-            <div class="message ai"><strong>Assistant:</strong> {{ response_text }}</div>
-        </div>
-        {% endif %}
-
-        <div class="divider"></div>
-
-        <!-- Attack Path 2: Discover the debug endpoint -->
-        <h3 class="section-title">Path 2 — Explore the application's API</h3>
-        <p class="hint">
-            Many apps expose debug or status endpoints that inadvertently leak configuration.
-            Try browsing to <code>/api/debug</code> on this server.
-        </p>
-
-        <div class="divider"></div>
-
-        <!-- Submit key -->
-        <h3 class="section-title">Found the API key? Submit it here.</h3>
-        <form method="POST" action="/submit-key">
-            <input type="text" name="api_key" placeholder="Paste the API key here..." required>
-            <button type="submit">Submit Key</button>
-        </form>
-
-        {% if key_submitted is defined and key_submitted is not none and not success %}
-        <div class="error-box">
-            ❌ <strong>Incorrect.</strong> That's not the right key. Keep looking.
-        </div>
-        {% endif %}
-
+    {% if success %}
+    <div class="success">
+      🎉 <strong>Congratulations!</strong> You found the API key hidden in the system prompt!<br><br>
+      Flag: <code>flag{Syst3m_Pr0mpt_L3ak3d}</code>
     </div>
+    {% endif %}
+
+    <h3 class="section-title">Path 1 — Ask the assistant</h3>
+    <p class="hint">The LLM has been instructed to keep the key secret. Can you trick it into revealing it?</p>
+
+    <form method="POST" action="/ask" onsubmit="showLoading()">
+      <textarea name="message" rows="3" placeholder="Type a prompt to extract the API key…" required></textarea>
+      <button type="submit" style="margin-top:0.75rem;">Ask the Assistant</button>
+    </form>
+
+    <div id="loading" class="loading" style="display:none;">⏳ Please wait, thinking hard…</div>
+
+    {% if response_text %}
+    <div class="history">
+      <div class="message user"><strong>You:</strong> {{ user_input }}</div>
+      <div class="message ai"><strong>Assistant:</strong> {{ response_text }}</div>
+    </div>
+    {% endif %}
+
+    <div class="divider"></div>
+
+    <h3 class="section-title">Path 2 — Explore the application's API</h3>
+    <p class="hint">
+      Many apps expose debug or status endpoints that inadvertently leak configuration.
+      Try browsing to <code>/api/debug</code> on this server.
+    </p>
+
+    <div class="divider"></div>
+
+    <h3 class="section-title">Found the API key? Submit it here.</h3>
+    <form method="POST" action="/submit-key">
+      <input type="text" name="api_key" placeholder="Paste the API key here…" required style="margin-bottom:0.75rem;">
+      <button type="submit">Submit Key</button>
+    </form>
+
+    {% if key_submitted is defined and key_submitted is not none and not success %}
+    <div class="error-box">❌ <strong>Incorrect.</strong> That's not the right key. Keep looking.</div>
+    {% endif %}
+  </div>
+</main>
+
 </body>
 </html>
