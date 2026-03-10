@@ -13,6 +13,12 @@
     <p class="subtitle">This challenge simulates attacks on large language model (LLM) supply chains, like compromised model. The pre-trained model sends user chat data to attacker controlled server. </p>  
     <p class="subtitle">Goal: Identify the suspicious component in the AI supply chain</p>
 
+    <!-- Pre-lab cleanup -->
+    <div class="prelab-bar">
+      <button class="btn-cleanup" onclick="preLabCleanup()">⚙ Pre-lab Cleanup</button>
+      <span id="cleanup-status" class="cleanup-status"></span>
+    </div>
+
     <!-- Model Selection -->
     <div class="form-group">
       <label for="model-select">Choose a model:</label>
@@ -32,6 +38,24 @@
       <div class="chat-input">
         <input type="text" id="prompt" placeholder="Ask about the supply chain..." />
         <button onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+
+    <!-- Live monitors -->
+    <div class="monitors">
+      <div class="monitor-panel">
+        <div class="monitor-header">
+          <span>📡 Exfil Monitor</span>
+          <span id="exfil-dot" class="dot dot-idle"></span>
+        </div>
+        <pre id="exfil-output" class="monitor-output">Waiting for data…</pre>
+      </div>
+      <div class="monitor-panel">
+        <div class="monitor-header">
+          <span>🚩 Flag Server</span>
+          <span id="flag-dot" class="dot dot-idle"></span>
+        </div>
+        <pre id="flag-output" class="monitor-output">Waiting…</pre>
       </div>
     </div>
   </div>
