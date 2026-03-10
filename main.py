@@ -1,5 +1,7 @@
 from flask import Flask, render_template, redirect, request, jsonify, Response, stream_with_context
 import subprocess, sys, os, requests, psutil, time, socket
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 

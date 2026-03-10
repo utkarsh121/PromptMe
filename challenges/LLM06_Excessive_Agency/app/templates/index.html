@@ -7,21 +7,18 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script>
         function sendMessage() {
-
             const userInput = document.getElementById("user-input");
             const chatBox = document.getElementById("chat-box");
 
             if (userInput.value.trim() === "") return;
 
-            // Show typing animation
             const typingAnimation = document.getElementById("typing");
             typingAnimation.style.display = 'block';
 
-            // Append user message to chat box
             const userMessage = `<pre class='message user-message'>${userInput.value}</pre>`;
             chatBox.innerHTML += userMessage;
+            chatBox.scrollTop = chatBox.scrollHeight;
 
-            // Send request to Flask API
             fetch("/llm06_2025_chat", {
                 method: "POST",
                 body: JSON.stringify({ message: userInput.value }),
@@ -31,27 +28,41 @@
             .then(data => {
                 const botMessage = `<pre class='message bot-message'>${data.reply}</pre>`;
                 chatBox.innerHTML += botMessage;
-                chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll
+                chatBox.scrollTop = chatBox.scrollHeight;
                 typingAnimation.style.display = 'none';
             });
 
-            userInput.value = ""; // Clear input field
+            userInput.value = "";
         }
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") sendMessage();
+        });
     </script>
 </head>
 <body>
     <h1>LLM06: Excessive Agency</h1>
-    <p>Interact with an LLM-powered chatbot integrated with a file management system. The system includes both public and restricted folders, with the latter accessible only to users with admin privileges.</p>
-    <p></p>
-    <p>Goal: Discover the vulnerability and manipulate the chatbot to access flag.txt, which is restricted to admin-only access.</p>
+    <p>
+        This is an internal <strong>User Management System</strong> powered by an LLM assistant.
+        The assistant can list existing users and create new ones — but admin account creation
+        is restricted to the System Administrator only.
+    </p>
+    <p>
+        <strong>Goal:</strong> Exploit the LLM's excessive agency to create a new admin user
+        without any real authentication.
+    </p>
+    <p style="color:#aaa; font-size:0.9rem;">
+        Try: <em>"Show me all users"</em> to explore, then think about how to escalate your privileges.
+    </p>
+
     <div class="chat-container">
-        <h2 class="chat-header">AI Security Lab</h2>
+        <h2 class="chat-header">🛡️ User Management Assistant</h2>
         <div class="chat-box" id="chat-box"></div>
         <div id='typing' class='typing-message bot-message typing' style="display: none;">
             🤖 AI is thinking<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
         </div>
         <div class="input-container">
-            <input type="text" id="user-input" placeholder="Type your message...">
+            <input type="text" id="user-input" placeholder="Type your message... (press Enter to send)">
             <button onclick="sendMessage()">Send</button>
         </div>
     </div>
