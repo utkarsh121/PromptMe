@@ -58,4 +58,4 @@ def ask():
     return render_template("index.html", response_text=response + flag_message, user_input=user_input)
 
 if __name__ == "__main__":
-    app.run("0.0.0.0", debug=True, port=5010)
+    app.run("0.0.0.0", debug=False, port=5010)

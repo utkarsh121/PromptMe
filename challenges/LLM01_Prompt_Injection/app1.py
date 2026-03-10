@@ -2,8 +2,9 @@ from flask import Flask, render_template, request, session, redirect, url_for, f
 import requests
 from bs4 import BeautifulSoup
 import uuid
-import ollama
 import os
+
+OLLAMA_BASE = "http://localhost:11434"
 from markupsafe import Markup
 
 app = Flask(__name__)
@@ -31,11 +32,12 @@ def store_message(user_id, role, content):
 
 # Main chat model call
 def call_ollama(prompt):
-    response = ollama.chat(
-        model=os.getenv('PROMPTME_CHAT_MODEL', 'mistral'),
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response['message']['content']
+    resp = requests.post(f"{OLLAMA_BASE}/api/chat", json={
+        "model": os.getenv('PROMPTME_CHAT_MODEL', 'mistral'),
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False
+    }, timeout=600)
+    return resp.json()["message"]["content"]
 
 # Guardian model to detect malicious input
 def check_malicious_input(user_input):
@@ -49,11 +51,12 @@ def check_malicious_input(user_input):
     )
 
     try:
-        response = ollama.chat(
-            model=os.getenv('PROMPTME_GUARDIAN_MODEL', 'granite3-guardian'),
-            messages=[{"role": "user", "content": guardian_prompt}]
-        )
-        verdict_raw = response['message']['content'].strip()
+        resp = requests.post(f"{OLLAMA_BASE}/api/chat", json={
+            "model": os.getenv('PROMPTME_GUARDIAN_MODEL', 'granite3-guardian'),
+            "messages": [{"role": "user", "content": guardian_prompt}],
+            "stream": False
+        }, timeout=600)
+        verdict_raw = resp.json()["message"]["content"].strip()
         verdict = verdict_raw.upper()
         print("[DEBUG] Guardian Model Raw Response:", verdict_raw)
 

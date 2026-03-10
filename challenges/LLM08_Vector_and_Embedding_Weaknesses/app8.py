@@ -108,4 +108,4 @@ def clear_vector_store_route():
 
 if __name__ == "__main__":
     preload_vector_store()
-    app.run(host="0.0.0.0", port=5008, debug=True)
+    app.run(host="0.0.0.0", port=5008, debug=False)
