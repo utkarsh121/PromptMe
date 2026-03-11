@@ -8,7 +8,7 @@ app = Flask(__name__)
 running_apps = {}
 
 # ── Lite-mode hardcoded model constants ───────────────────────────
-MODELS_LITE = ['phi3:mini', 'granite3.1-moe:1b']
+MODELS_LITE = ['phi3:mini', 'granite3.1-moe:1b', 'qwen2.5:1.5b']
 
 LITE_ENV = {
     'PROMPTME_CHAT_MODEL':     'phi3:mini',
@@ -16,6 +16,7 @@ LITE_ENV = {
     'PROMPTME_SQL_MODEL':      'phi3:mini',
     'PROMPTME_GUARDIAN_MODEL': 'granite3.1-moe:1b',
     'PROMPTME_EMBED_MODEL':    'granite3.1-moe:1b',
+    'PROMPTME_AGENT_MODEL':    'qwen2.5:1.5b',
 }
 
 OLLAMA_BASE = "http://localhost:11434"

@@ -514,9 +514,9 @@ ok "Ollama API is up at http://localhost:${OLLAMA_PORT}"
 step_header "Pulling models"
 
 warn "Model downloads can take several minutes depending on internet speed."
-warn "phi3:mini ≈ 2.2 GB  ·  granite3.1-moe:1b ≈ 800 MB"
+warn "phi3:mini ≈ 2.2 GB  ·  granite3.1-moe:1b ≈ 800 MB  ·  qwen2.5:1.5b ≈ 1 GB"
 
-MODELS=("phi3:mini" "granite3.1-moe:1b")
+MODELS=("phi3:mini" "granite3.1-moe:1b" "qwen2.5:1.5b")
 for _model in "${MODELS[@]}"; do
     # `ollama list` output includes the model name before the colon tag.
     _model_base="${_model%%:*}"
@@ -697,7 +697,7 @@ echo -e "═══════════════════════�
 echo ""
 printf "  %-22s %s\n" "Dashboard:"        "http://localhost:5000"
 printf "  %-22s %s\n" "Challenges:"       "http://localhost:5001 – 5010"
-printf "  %-22s %s\n" "Models:"           "phi3:mini + granite3.1-moe:1b"
+printf "  %-22s %s\n" "Models:"           "phi3:mini + granite3.1-moe:1b + qwen2.5:1.5b"
 printf "  %-22s %s\n" "GPU acceleration:" "${GPU_FOUND} [${GPU_TYPE}]  ($GPU_INFO)"
 printf "  %-22s %s\n" "Install directory:" "$INSTALL_DIR"
 printf "  %-22s %s\n" "Running as user:"  "$REAL_USER"
