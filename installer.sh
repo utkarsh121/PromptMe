@@ -427,35 +427,30 @@ else
     ok "ollama/ollama image pulled"
 fi
 
-_ollama_state=$(priv docker inspect -f '{{.State.Status}}' "$OLLAMA_CONTAINER" 2>/dev/null || echo "missing")
-[[ -z "$_ollama_state" ]] && _ollama_state="missing"
-
-case "$_ollama_state" in
-    running)
-        ok "Ollama container already running"
-        ;;
-    exited|created|paused)
-        info "Starting existing Ollama container …"
+# Use &>/dev/null to suppress both stdout and stderr from docker inspect —
+# some Docker versions write errors to stdout which would pollute the variable.
+if ! priv docker inspect "$OLLAMA_CONTAINER" &>/dev/null; then
+    # Container does not exist — create and start it.
+    info "Creating Ollama container '${OLLAMA_CONTAINER}' (GPU: ${GPU_FOUND}) …"
+    # shellcheck disable=SC2086
+    priv docker run -d \
+        --name "$OLLAMA_CONTAINER" \
+        --restart unless-stopped \
+        -p "${OLLAMA_PORT}:11434" \
+        -v ollama:/root/.ollama \
+        $GPU_FLAGS \
+        ollama/ollama
+    ok "Ollama container '${OLLAMA_CONTAINER}' created and started"
+else
+    _ollama_state=$(priv docker inspect -f '{{.State.Status}}' "$OLLAMA_CONTAINER" 2>/dev/null || true)
+    if [[ "$_ollama_state" == "running" ]]; then
+        ok "Ollama container '${OLLAMA_CONTAINER}' already running"
+    else
+        info "Ollama container '${OLLAMA_CONTAINER}' exists (state: ${_ollama_state}) — starting …"
         priv docker start "$OLLAMA_CONTAINER"
-        ok "Ollama container started"
-        ;;
-    missing)
-        info "Creating Ollama container (GPU: ${GPU_FOUND}) …"
-        # shellcheck disable=SC2086
-        priv docker run -d \
-            --name "$OLLAMA_CONTAINER" \
-            --restart unless-stopped \
-            -p "${OLLAMA_PORT}:11434" \
-            -v ollama:/root/.ollama \
-            $GPU_FLAGS \
-            ollama/ollama
-        ok "Ollama container created"
-        ;;
-    *)
-        warn "Unexpected Ollama container state: $_ollama_state — attempting start …"
-        priv docker start "$OLLAMA_CONTAINER" 2>/dev/null || true
-        ;;
-esac
+        ok "Ollama container '${OLLAMA_CONTAINER}' started"
+    fi
+fi
 
 # Wait for Ollama API to become ready.
 info "Waiting for Ollama API (up to 60 s) …"
