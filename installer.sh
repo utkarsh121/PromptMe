@@ -8,7 +8,7 @@
 # │  Also works as:  bash installer.sh                                          │
 # │                  sudo bash installer.sh                                     │
 # │  Supports: Ubuntu/Debian (apt) · RHEL/Fedora/CentOS (dnf/yum)              │
-# │  GPU:       auto-detects NVIDIA, enables GPU passthrough to Ollama          │
+# │  GPU:       auto-detects NVIDIA/AMD, enables GPU passthrough to Ollama      │
 # └─────────────────────────────────────────────────────────────────────────────┘
 
 # NOTE: We intentionally do NOT use `set -euo pipefail` globally.
@@ -345,26 +345,60 @@ ok "Docker daemon is running"
 
 step_header "GPU detection"
 
-GPU_FOUND=false; GPU_FLAGS=""; GPU_INFO="none"
+GPU_FOUND=false; GPU_TYPE="none"; GPU_FLAGS=""; GPU_INFO="none"
 
 if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
     GPU_FOUND=true
+    GPU_TYPE="nvidia"
     GPU_FLAGS="--gpus all"
     GPU_INFO=$(nvidia-smi --query-gpu=name,memory.total \
                --format=csv,noheader 2>/dev/null | head -1 || echo "unknown")
     ok "NVIDIA GPU detected: $GPU_INFO"
+elif command -v rocm-smi &>/dev/null && rocm-smi &>/dev/null; then
+    GPU_FOUND=true
+    GPU_TYPE="amd"
+    GPU_FLAGS="--device=/dev/kfd --device=/dev/dri"
+    GPU_INFO=$(rocm-smi --showproductname 2>/dev/null | grep -i "card\|gpu" | head -1 | sed 's/.*: //' || echo "unknown")
+    ok "AMD GPU detected via rocm-smi: $GPU_INFO"
+elif [[ -e /dev/kfd ]]; then
+    # /dev/kfd present but rocm-smi not installed yet — AMD ROCm device confirmed via kernel driver
+    GPU_FOUND=true
+    GPU_TYPE="amd"
+    GPU_FLAGS="--device=/dev/kfd --device=/dev/dri"
+    GPU_INFO=$(lspci 2>/dev/null | grep -i "amd\|ati\|radeon\|instinct" | head -1 | sed 's/.*: //' || echo "AMD GPU (ROCm)")
+    ok "AMD GPU detected via /dev/kfd: $GPU_INFO"
 else
-    info "No NVIDIA GPU detected — running CPU-only (Lite mode works fine)"
+    # Last-resort lspci check — catches MxGPU/SR-IOV AMD vGPUs where /dev/kfd may not exist
+    _lspci_amd=$(lspci 2>/dev/null | grep -iE "amd|ati|radeon|instinct" | grep -iv "audio\|usb\|sata" | head -1 || true)
+    _lspci_nvidia=$(lspci 2>/dev/null | grep -iE "nvidia" | grep -iv "audio" | head -1 || true)
+    if [[ -n "$_lspci_nvidia" ]]; then
+        # NVIDIA GPU visible in PCI but nvidia-smi failed — driver not loaded
+        GPU_FOUND=false
+        GPU_TYPE="nvidia-no-driver"
+        GPU_INFO="$_lspci_nvidia"
+        warn "NVIDIA GPU found in lspci but nvidia-smi failed — driver may not be loaded; falling back to CPU"
+    elif [[ -n "$_lspci_amd" ]]; then
+        # AMD/Instinct visible in PCI but no ROCm stack — attempt device passthrough anyway
+        GPU_FOUND=true
+        GPU_TYPE="amd"
+        GPU_FLAGS="--device=/dev/dri"
+        # /dev/kfd may not exist without ROCm driver; omit it to avoid docker run failure
+        [[ -e /dev/kfd ]] && GPU_FLAGS="--device=/dev/kfd --device=/dev/dri"
+        GPU_INFO="$_lspci_amd (ROCm driver not confirmed)"
+        warn "AMD GPU found via lspci — ROCm driver not confirmed; attempting DRI passthrough: $GPU_INFO"
+    else
+        info "No GPU detected — running CPU-only (Lite mode works fine on CPU)"
+    fi
 fi
 
 ###############################################################################
-# ── [5/11]  NVIDIA Container Toolkit (GPU only) ───────────────────────────────
+# ── [5/11]  NVIDIA Container Toolkit (NVIDIA GPU only) ───────────────────────
 ###############################################################################
 
 step_header "NVIDIA Container Toolkit"
 
-if [[ "$GPU_FOUND" == "false" ]]; then
-    info "GPU not present — skipping NVIDIA Container Toolkit"
+if [[ "$GPU_TYPE" != "nvidia" ]]; then
+    info "GPU type is '${GPU_TYPE}' — skipping NVIDIA Container Toolkit"
 else
     _nct_installed=false
     dpkg -l nvidia-container-toolkit &>/dev/null 2>&1 && _nct_installed=true || true
@@ -664,7 +698,7 @@ echo ""
 printf "  %-22s %s\n" "Dashboard:"        "http://localhost:5000"
 printf "  %-22s %s\n" "Challenges:"       "http://localhost:5001 – 5010"
 printf "  %-22s %s\n" "Models:"           "phi3:mini + granite3.1-moe:1b"
-printf "  %-22s %s\n" "GPU acceleration:" "$GPU_FOUND  ($GPU_INFO)"
+printf "  %-22s %s\n" "GPU acceleration:" "${GPU_FOUND} [${GPU_TYPE}]  ($GPU_INFO)"
 printf "  %-22s %s\n" "Install directory:" "$INSTALL_DIR"
 printf "  %-22s %s\n" "Running as user:"  "$REAL_USER"
 printf "  %-22s %s\n" "Install log:"      "$LOG_FILE"
