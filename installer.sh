@@ -503,18 +503,51 @@ step_header "PromptMe repository"
 REPO_URL="https://github.com/utkarsh121/PromptMe.git"
 REPO_BRANCH="lite-mode"
 
-# Ensure the install root exists and is owned by the real user from the start.
-priv mkdir -p "$INSTALL_DIR"
-priv chown "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
-
 if [[ -d "$INSTALL_DIR/.git" ]]; then
+    # Clean git repo — just update it.
     info "Repository already present at $INSTALL_DIR — updating …"
-    # Run as the real user so git credentials and ownership stay clean.
     as_user git -C "$INSTALL_DIR" fetch origin "$REPO_BRANCH"
     as_user git -C "$INSTALL_DIR" checkout "$REPO_BRANCH"
     as_user git -C "$INSTALL_DIR" pull origin "$REPO_BRANCH"
     ok "Repository updated"
+
+elif [[ -d "$INSTALL_DIR" ]]; then
+    # Directory exists but is NOT a git repo — likely a failed previous install.
+    warn "Directory $INSTALL_DIR already exists but is not a git repository."
+    warn "This is likely from a previous failed install attempt."
+    echo ""
+
+    _overwrite="n"
+    if [[ -t 0 ]]; then
+        # stdin is a terminal — ask interactively.
+        read -rp "  Overwrite and reinstall? This will delete $INSTALL_DIR [y/N]: " _overwrite
+    else
+        # stdin is a pipe (curl|bash) — cannot ask; print clear instruction and abort.
+        fail "Cannot prompt interactively (running via pipe)."
+        fail "To reinstall, remove the directory first and re-run:"
+        fail "  sudo rm -rf $INSTALL_DIR"
+        fail "  curl -fsSL https://raw.githubusercontent.com/utkarsh121/PromptMe/lite-mode/installer.sh | bash"
+        exit 1
+    fi
+
+    if [[ "${_overwrite,,}" == "y" ]]; then
+        info "Removing $INSTALL_DIR and reinstalling …"
+        priv rm -rf "$INSTALL_DIR"
+        priv mkdir -p "$INSTALL_DIR"
+        priv chown "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
+        info "Cloning PromptMe (branch: $REPO_BRANCH) into $INSTALL_DIR …"
+        as_user git clone --branch "$REPO_BRANCH" --single-branch \
+            "$REPO_URL" "$INSTALL_DIR"
+        ok "Repository cloned"
+    else
+        fail "Aborted by user. Remove $INSTALL_DIR manually and re-run the installer."
+        exit 1
+    fi
+
 else
+    # Fresh install — create directory and clone.
+    priv mkdir -p "$INSTALL_DIR"
+    priv chown "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
     info "Cloning PromptMe (branch: $REPO_BRANCH) into $INSTALL_DIR …"
     as_user git clone --branch "$REPO_BRANCH" --single-branch \
         "$REPO_URL" "$INSTALL_DIR"
