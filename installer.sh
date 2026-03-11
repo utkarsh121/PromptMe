@@ -416,6 +416,17 @@ step_header "Ollama container"
 OLLAMA_CONTAINER="ollama"
 OLLAMA_PORT=11434
 
+# Pull the Ollama Docker image explicitly before attempting container operations.
+# docker run would auto-pull, but doing it separately gives visible progress and
+# ensures the image is present before any container state logic runs.
+if priv docker image inspect ollama/ollama &>/dev/null; then
+    ok "ollama/ollama image already present"
+else
+    info "Pulling ollama/ollama Docker image (≈ 1 GB) …"
+    priv docker pull ollama/ollama
+    ok "ollama/ollama image pulled"
+fi
+
 _ollama_state=$(priv docker inspect -f '{{.State.Status}}' "$OLLAMA_CONTAINER" 2>/dev/null || echo "missing")
 [[ -z "$_ollama_state" ]] && _ollama_state="missing"
 
