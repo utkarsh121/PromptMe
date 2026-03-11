@@ -256,15 +256,17 @@ step_header "System prerequisites"
 if already_done "prereqs"; then
     ok "Prerequisites already installed (cached state)"
 else
-    info "Updating package lists and installing prerequisites …"
+    info "Updating and upgrading system packages (may take a few minutes) …"
     if [[ "$PKG" == "apt" ]]; then
         priv apt-get update -qq
+        priv apt-get upgrade -y -qq
         priv apt-get install -y -qq \
-            curl git python3 python3-pip python3-venv \
+            curl unzip python3 python3-pip python3-venv \
             ca-certificates gnupg lsb-release
     else
+        priv "$PKG" upgrade -y -q
         priv "$PKG" install -y -q \
-            curl git python3 python3-pip \
+            curl unzip python3 python3-pip python3-venv \
             ca-certificates
     fi
     mark_done "prereqs"
@@ -495,67 +497,30 @@ for _model in "${MODELS[@]}"; do
 done
 
 ###############################################################################
-# ── [8/11]  Clone / update repository ────────────────────────────────────────
+# ── [8/11]  Download PromptMe application files ──────────────────────────────
 ###############################################################################
 
-step_header "PromptMe repository"
+step_header "PromptMe application files"
 
-REPO_URL="https://github.com/utkarsh121/PromptMe.git"
-REPO_BRANCH="lite-mode"
+REPO_ZIP="https://github.com/utkarsh121/PromptMe/archive/refs/heads/lite-mode.zip"
+_zip_tmp=$(mktemp /tmp/promptme-XXXXXX.zip)
 
-if [[ -d "$INSTALL_DIR/.git" ]]; then
-    # Clean git repo — just update it.
-    info "Repository already present at $INSTALL_DIR — updating …"
-    as_user git -C "$INSTALL_DIR" fetch origin "$REPO_BRANCH"
-    as_user git -C "$INSTALL_DIR" checkout "$REPO_BRANCH"
-    as_user git -C "$INSTALL_DIR" pull origin "$REPO_BRANCH"
-    ok "Repository updated"
+info "Downloading PromptMe (lite-mode) …"
+curl -fsSL "$REPO_ZIP" -o "$_zip_tmp"
+ok "Download complete"
 
-elif [[ -d "$INSTALL_DIR" ]]; then
-    # Directory exists but is NOT a git repo — likely a failed previous install.
-    warn "Directory $INSTALL_DIR already exists but is not a git repository."
-    warn "This is likely from a previous failed install attempt."
-    echo ""
+info "Installing to $INSTALL_DIR …"
+priv rm -rf "$INSTALL_DIR"
+priv mkdir -p "$INSTALL_DIR"
 
-    _overwrite="n"
-    if [[ -t 0 ]]; then
-        # stdin is a terminal — ask interactively.
-        read -rp "  Overwrite and reinstall? This will delete $INSTALL_DIR [y/N]: " _overwrite
-    else
-        # stdin is a pipe (curl|bash) — cannot ask; print clear instruction and abort.
-        fail "Cannot prompt interactively (running via pipe)."
-        fail "To reinstall, remove the directory first and re-run:"
-        fail "  sudo rm -rf $INSTALL_DIR"
-        fail "  curl -fsSL https://raw.githubusercontent.com/utkarsh121/PromptMe/lite-mode/installer.sh | bash"
-        exit 1
-    fi
+# GitHub zips extract to a subdirectory named <repo>-<branch>/
+_extract_tmp=$(mktemp -d /tmp/promptme-extract-XXXXXX)
+unzip -q "$_zip_tmp" -d "$_extract_tmp"
+priv cp -r "$_extract_tmp"/PromptMe-lite-mode/. "$INSTALL_DIR/"
+rm -rf "$_zip_tmp" "$_extract_tmp"
 
-    if [[ "${_overwrite,,}" == "y" ]]; then
-        info "Removing $INSTALL_DIR and reinstalling …"
-        priv rm -rf "$INSTALL_DIR"
-        priv mkdir -p "$INSTALL_DIR"
-        priv chown "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
-        info "Cloning PromptMe (branch: $REPO_BRANCH) into $INSTALL_DIR …"
-        as_user git clone --branch "$REPO_BRANCH" --single-branch \
-            "$REPO_URL" "$INSTALL_DIR"
-        ok "Repository cloned"
-    else
-        fail "Aborted by user. Remove $INSTALL_DIR manually and re-run the installer."
-        exit 1
-    fi
-
-else
-    # Fresh install — create directory and clone.
-    priv mkdir -p "$INSTALL_DIR"
-    priv chown "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
-    info "Cloning PromptMe (branch: $REPO_BRANCH) into $INSTALL_DIR …"
-    as_user git clone --branch "$REPO_BRANCH" --single-branch \
-        "$REPO_URL" "$INSTALL_DIR"
-    ok "Repository cloned"
-fi
-
-# Ensure ownership is correct after clone/update.
 priv chown -R "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
+ok "PromptMe files installed to $INSTALL_DIR"
 
 ###############################################################################
 # ── [9/11]  Python virtual environment & dependencies ────────────────────────
