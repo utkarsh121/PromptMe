@@ -111,6 +111,7 @@ CHALLENGE_MAP = {
     8:  (5008, "challenges/LLM08_Vector_and_Embedding_Weaknesses/app8.py"),
     9:  (5009, "challenges/LLM09_Misinformation/app9.py"),
     10: (5010, "challenges/LLM10_Unbounded_Consumption/app10.py"),
+    11: (5011, "challenges/ADDN01_Indirect_Prompt_Injection/app11.py"),
 }
 
 @app.route('/start/<int:challenge_id>')

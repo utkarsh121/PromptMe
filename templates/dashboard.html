@@ -78,13 +78,15 @@
   <!-- ── Additional Labs ─────────────────────────────────────────── -->
   <div class="section-divider"><span>Additional Labs</span></div>
   <div class="tiles-container">
-    <div class="tile tile-addon">
+    <div class="tile tile-addon" id="tile-11">
+      <div class="running-status" id="status-11">Running</div>
       <i class="fas fa-envelope-open-text"></i>
       <h3>Addn. Lab 01: Indirect Prompt Injection</h3>
       <p class="tile-desc">Malicious instructions embedded in external data sources hijack LLM behaviour</p>
       <div class="tile-badges"><span class="tile-badge badge-generative">Generative AI</span><span class="tile-badge badge-saif">SAIF Cat 8+11</span></div>
       <div class="tile-buttons">
-        <button class="tile-button coming-soon" disabled>Coming Soon</button>
+        <button class="tile-button start" onclick="startChallenge(11)">Start</button>
+        <button class="tile-button stop"  onclick="stopChallenge(11)">Stop</button>
       </div>
     </div>
     <div class="tile tile-addon">

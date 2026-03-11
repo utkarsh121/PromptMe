@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Addn. Lab 01: Indirect Prompt Injection</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .email-client {
+      display: flex;
+      gap: 1rem;
+      height: calc(100vh - 200px);
+      min-height: 480px;
+    }
+    .inbox-panel {
+      width: 300px;
+      flex-shrink: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .inbox-header {
+      background: var(--card-raised);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .inbox-count {
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+    .inbox-row {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .inbox-row:hover { background: var(--card-raised); }
+    .inbox-row.active { background: rgba(46,156,202,0.08); border-left: 3px solid var(--accent); }
+    .inbox-row-suspicious { border-left: 3px solid #d97706; }
+    .inbox-row-suspicious:hover { background: rgba(217,119,6,0.06); }
+    .inbox-sender { font-size: 0.78rem; font-weight: 600; color: var(--text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .inbox-subject { font-size: 0.8rem; color: var(--text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .inbox-preview { font-size: 0.72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .suspicious-tag {
+      display: inline-block;
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(217,119,6,0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(217,119,6,0.3);
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .detail-panel {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow-y: auto;
+    }
+    .detail-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+    }
+    .email-detail { padding: 1.5rem; }
+    .email-meta {
+      background: var(--card-raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+    .email-meta-row { display: flex; gap: 0.5rem; font-size: 0.83rem; margin-bottom: 2px; }
+    .meta-label { color: var(--muted); font-weight: 600; min-width: 60px; }
+    .meta-value { color: var(--text); }
+    .email-body {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      font-size: 0.88rem;
+      color: var(--text);
+      line-height: 1.7;
+      margin-bottom: 1rem;
+      font-family: 'DM Mono', monospace;
+      white-space: pre-wrap;
+    }
+    .summarize-btn {
+      background: var(--accent);
+      margin-bottom: 1rem;
+    }
+    .ai-response-header {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+    }
+    .ai-response-body {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-left: 3px solid #4ade80;
+      border-radius: 6px;
+      padding: 1rem;
+      font-size: 0.88rem;
+      color: var(--text);
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+
+<header class="lab-header">
+  <span class="lab-badge" style="background:#d97706;">ADDN.01</span>
+  <h1>Indirect Prompt Injection</h1>
+  <a href="http://127.0.0.1:5000" class="back-link">← Dashboard</a>
+</header>
+
+<main class="lab-main" style="max-width:1100px;">
+
+  <div class="container" style="padding:1rem 1.5rem;margin-bottom:1rem;">
+    <p class="subtitle">You have access to an AI-powered email assistant that summarises your inbox emails.</p>
+    <p class="lab-goal"><strong>Goal:</strong> Find an email that contains a hidden injection payload. Open it, let the AI summarise it, and observe what the AI does with the other emails in your inbox.</p>
+  </div>
+
+  <div class="email-client">
+
+    <!-- ── Inbox list ──────────────────────────────────── -->
+    <div class="inbox-panel">
+      <div class="inbox-header">
+        <i class="fas fa-inbox"></i> Inbox
+        <span class="inbox-count">{{ emails|length }}</span>
+      </div>
+      {% for email in emails %}
+      <div class="inbox-row {% if loop.last %}inbox-row-suspicious{% endif %}"
+           onclick="openEmail({{ email.id }})">
+        {% if loop.last %}
+        <div class="suspicious-tag">External</div>
+        {% endif %}
+        <div class="inbox-sender">{{ email.sender }}</div>
+        <div class="inbox-subject">{{ email.subject }}</div>
+        <div class="inbox-preview">{{ email.preview }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- ── Detail panel ────────────────────────────────── -->
+    <div class="detail-panel" id="detailPanel">
+      <div class="detail-empty">
+        <i class="fas fa-envelope-open" style="font-size:2.5rem;color:var(--border);"></i>
+        <p style="margin-top:0.75rem;font-size:0.88rem;">Select an email from your inbox to open it</p>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const EMAILS = {{ emails | tojson }};
+
+  function openEmail(id) {
+    const email = EMAILS.find(e => e.id === id);
+    if (!email) return;
+
+    document.querySelectorAll('.inbox-row').forEach(r => r.classList.remove('active'));
+    document.querySelectorAll('.inbox-row')[EMAILS.indexOf(email)].classList.add('active');
+
+    document.getElementById('detailPanel').innerHTML = `
+      <div class="email-detail">
+        <div class="email-meta">
+          <div class="email-meta-row">
+            <span class="meta-label">From:</span>
+            <span class="meta-value">${escHtml(email.sender)}</span>
+          </div>
+          <div class="email-meta-row">
+            <span class="meta-label">Subject:</span>
+            <span class="meta-value">${escHtml(email.subject)}</span>
+          </div>
+        </div>
+        <div class="email-body">${escHtml(email.body)}</div>
+        <button class="btn btn-block summarize-btn" onclick="summarize(${id})" id="summarizeBtn">
+          <i class="fas fa-wand-magic-sparkles" style="margin-right:6px;"></i>Summarise with AI
+        </button>
+        <div id="loadingMsg" style="display:none;" class="loading">
+          ⏳ AI is reading the email… this may take a few minutes.
+        </div>
+        <div id="aiResponse" style="display:none;margin-top:1rem;"></div>
+        <div id="flagBox" style="display:none;margin-top:1rem;"></div>
+      </div>`;
+  }
+
+  function summarize(id) {
+    const btn = document.getElementById('summarizeBtn');
+    const loading = document.getElementById('loadingMsg');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Thinking…';
+    loading.style.display = 'block';
+
+    fetch(`/summarize/${id}`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        loading.style.display = 'none';
+        btn.style.display = 'none';
+
+        const respEl = document.getElementById('aiResponse');
+        respEl.style.display = 'block';
+        respEl.innerHTML = `
+          <div class="ai-response-header">
+            <i class="fas fa-robot" style="margin-right:6px;"></i>AI Summary
+          </div>
+          <div class="ai-response-body">${escHtml(data.response)}</div>`;
+
+        if (data.flag) {
+          const flagEl = document.getElementById('flagBox');
+          flagEl.style.display = 'block';
+          flagEl.innerHTML = `
+            <div class="flag-box">
+              🎉 Injection successful! The AI leaked confidential data from another email.<br><br>
+              Flag: ${escHtml(data.flag)}
+            </div>`;
+        }
+      })
+      .catch(() => {
+        loading.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-wand-magic-sparkles" style="margin-right:6px;"></i>Summarise with AI';
+      });
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/\n/g, '<br>');
+  }
+</script>
+</body>
+</html>
