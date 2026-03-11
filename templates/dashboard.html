@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI Security Lab — OWASP LLM Top 10</title>
+  <title>AI Security Lab</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
@@ -44,8 +44,23 @@
 <!-- ── Main content ──────────────────────────────────────────────── -->
 <div class="page-body">
   <h1 class="page-title">AI Security Lab</h1>
-  <h3 class="page-subtitle">OWASP LLM Top 10 — CTF Challenges</h3>
+  <p class="page-subtitle">Click on each card to start the exercise</p>
 
+  <!-- ── Foundational AI Security Labs ──────────────────────────── -->
+  <div class="section-divider"><span>Foundational AI Security Labs</span></div>
+  <div class="tiles-container tiles-foundational">
+    <div class="tile tile-foundational">
+      <i class="fas fa-microscope"></i>
+      <h3>Foundational AI Security Labs</h3>
+      <p class="tile-desc">Classical ML attacks — evasion, data poisoning, membership inference &amp; model extraction via Jupyter notebooks</p>
+      <div class="tile-buttons">
+        <button class="tile-button coming-soon" disabled>Coming Soon</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OWASP LLM Top 10 ────────────────────────────────────────── -->
+  <div class="section-divider"><span>OWASP LLM Top 10 — CTF Challenges</span></div>
   <div class="tiles-container">
     {% for risk in risks %}
       <div class="tile" id="tile-{{ risk.id }}">
@@ -59,6 +74,39 @@
       </div>
     {% endfor %}
   </div>
+
+  <!-- ── Additional Labs ─────────────────────────────────────────── -->
+  <div class="section-divider"><span>Additional Labs</span></div>
+  <div class="tiles-container">
+    <div class="tile tile-addon">
+      <i class="fas fa-envelope-open-text"></i>
+      <h3>Addn. Lab 01: Indirect Prompt Injection</h3>
+      <p class="tile-desc">Malicious instructions embedded in external data sources hijack LLM behaviour</p>
+      <div class="tile-badges"><span class="tile-badge badge-generative">Generative AI</span><span class="tile-badge badge-saif">SAIF Cat 8+11</span></div>
+      <div class="tile-buttons">
+        <button class="tile-button coming-soon" disabled>Coming Soon</button>
+      </div>
+    </div>
+    <div class="tile tile-addon">
+      <i class="fas fa-robot"></i>
+      <h3>Addn. Lab 02: Agentic Tool Hijacking</h3>
+      <p class="tile-desc">Agent reads attacker-controlled content and executes unauthorized tool calls</p>
+      <div class="tile-badges"><span class="tile-badge badge-agentic">Agentic AI</span><span class="tile-badge badge-saif">SAIF Cat 11</span></div>
+      <div class="tile-buttons">
+        <button class="tile-button coming-soon" disabled>Coming Soon</button>
+      </div>
+    </div>
+    <div class="tile tile-addon">
+      <i class="fas fa-balance-scale"></i>
+      <h3>Addn. Lab 03: Bias Exploitation</h3>
+      <p class="tile-desc">Craft prompts that surface and exploit biased or stereotyped model outputs</p>
+      <div class="tile-badges"><span class="tile-badge badge-generative">Generative AI</span><span class="tile-badge badge-saif">SAIF Cat 9</span></div>
+      <div class="tile-buttons">
+        <button class="tile-button coming-soon" disabled>Coming Soon</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ── Activity bar (bottom) ─────────────────────────────────────── -->

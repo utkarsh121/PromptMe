@@ -322,6 +322,82 @@ body {
 
 .activity-idle { font-size: 0.72rem; color: var(--muted); font-style: italic; font-family: 'DM Mono', monospace; }
 
+/* ── Section dividers ─────────────────────────────────────────── */
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 2.5rem 0 1.25rem;
+}
+.section-divider::before,
+.section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.section-divider span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Foundational labs tile ───────────────────────────────────── */
+.tiles-foundational {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 380px));
+}
+.tile-foundational::before {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+}
+.tile-foundational i { color: #a78bfa; }
+
+/* ── Add-on labs tiles ────────────────────────────────────────── */
+.tile-addon::before {
+  background: linear-gradient(90deg, #d97706, #fbbf24);
+}
+.tile-addon i { color: #fbbf24; }
+
+/* ── Tile description text ────────────────────────────────────── */
+.tile-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 0.85rem;
+  line-height: 1.5;
+}
+
+/* ── Tile badges (SAIF / AI class) ───────────────────────────── */
+.tile-badges {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 0.85rem;
+}
+.tile-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-generative { background: rgba(46,156,202,0.12); color: var(--accent); border: 1px solid rgba(46,156,202,0.3); }
+.badge-agentic    { background: rgba(251,191,36,0.12);  color: #fbbf24;       border: 1px solid rgba(251,191,36,0.3); }
+.badge-saif       { background: rgba(255,255,255,0.05); color: var(--muted);  border: 1px solid var(--border); }
+
+/* ── Coming soon button ───────────────────────────────────────── */
+.tile-button.coming-soon {
+  background: var(--input-bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 /* ── Scrollbar ────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
