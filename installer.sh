@@ -61,7 +61,7 @@ _setup_log() {
     if touch "$LOG_FILE" 2>/dev/null; then
         chmod 644 "$LOG_FILE" 2>/dev/null || true
     elif sudo touch "$LOG_FILE" 2>/dev/null; then
-        sudo chmod 644 "$LOG_FILE"
+        sudo chmod 666 "$LOG_FILE"   # world-writable so tee (running as real user) can write
     else
         LOG_FILE="/tmp/promptme-install.log"
         touch "$LOG_FILE"
@@ -89,6 +89,7 @@ _on_error() {
     fail "Installer failed at line ${line} (exit code: ${code})."
     fail "Review the log for details: ${LOG_FILE}"
     fail "Fix the issue above, then re-run the installer — it is safe to retry."
+    exit "$code"
 }
 trap '_on_error $LINENO' ERR
 
@@ -225,7 +226,7 @@ already_done() { [[ -f "$STATE_DIR/$1" ]]; }
 # ── Package manager detection ─────────────────────────────────────────────────
 ###############################################################################
 
-section "Detecting system"
+echo -e "\n${BOLD}━━━ Detecting system ━━━${RESET}"
 
 if command -v apt-get &>/dev/null; then
     PKG="apt"
@@ -416,6 +417,7 @@ OLLAMA_CONTAINER="ollama"
 OLLAMA_PORT=11434
 
 _ollama_state=$(priv docker inspect -f '{{.State.Status}}' "$OLLAMA_CONTAINER" 2>/dev/null || echo "missing")
+[[ -z "$_ollama_state" ]] && _ollama_state="missing"
 
 case "$_ollama_state" in
     running)
