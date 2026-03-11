@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Addn. Lab 02: Agentic Tool Hijacking</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .agent-layout {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    /* ── Left: Document Store ──────────────────────────────────── */
+    .doc-panel {
+      width: 310px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .doc-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .doc-section-header {
+      background: var(--card-raised);
+      border-bottom: 1px solid var(--border);
+      padding: 9px 14px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .doc-list { padding: 6px 0; }
+    .doc-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+    .doc-row:last-child { border-bottom: none; }
+    .doc-row i { color: var(--muted); font-size: 0.75rem; flex-shrink: 0; }
+    .doc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'DM Mono', monospace; font-size: 0.78rem; }
+    .doc-badge-base {
+      font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+      background: rgba(46,156,202,0.12); color: var(--accent);
+      border: 1px solid rgba(46,156,202,0.25); text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .doc-badge-user {
+      font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+      background: rgba(217,119,6,0.12); color: #fbbf24;
+      border: 1px solid rgba(217,119,6,0.3); text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .doc-del-btn {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      padding: 2px 4px; font-size: 0.75rem; border-radius: 3px;
+      transition: color 0.15s;
+    }
+    .doc-del-btn:hover { color: #f87171; background: none; }
+
+    .submit-form { padding: 12px 14px; }
+    .submit-form label { font-size: 0.78rem; color: var(--muted); display: block; margin-bottom: 4px; font-weight: 600; }
+    .submit-form input[type="text"],
+    .submit-form textarea {
+      font-size: 0.82rem; padding: 0.5rem 0.7rem; margin-bottom: 8px;
+    }
+    .submit-form textarea { min-height: 100px; font-family: 'DM Mono', monospace; font-size: 0.78rem; }
+    .submit-form button { font-size: 0.82rem; padding: 0.5rem 1rem; }
+
+    /* ── Right: Agent panel ────────────────────────────────────── */
+    .agent-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .agent-task-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.25rem;
+    }
+    .agent-task-card label {
+      font-size: 0.82rem; font-weight: 600; color: var(--muted);
+      display: block; margin-bottom: 6px;
+    }
+    .agent-task-card textarea {
+      min-height: 70px; font-size: 0.88rem; margin-bottom: 10px;
+    }
+    .run-btn { background: #7c3aed; }
+    .run-btn:hover { background: #6d28d9; }
+
+    /* ── Tool execution log ────────────────────────────────────── */
+    .tool-log-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .tool-log-header {
+      background: var(--card-raised);
+      border-bottom: 1px solid var(--border);
+      padding: 9px 14px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .tool-log-body { padding: 10px 14px; min-height: 52px; }
+    .tool-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 0.82rem;
+      font-family: 'DM Mono', monospace;
+    }
+    .tool-entry:last-child { margin-bottom: 0; }
+    .tool-entry.ok       { background: rgba(46,156,202,0.08); border: 1px solid rgba(46,156,202,0.2); }
+    .tool-entry.error    { background: var(--error-bg); border: 1px solid var(--error-br); }
+    .tool-entry.hijacked { background: rgba(239,68,68,0.10); border: 1px solid rgba(239,68,68,0.35); }
+    .tool-name {
+      font-weight: 700; font-size: 0.75rem; padding: 1px 6px;
+      border-radius: 3px; white-space: nowrap; flex-shrink: 0;
+    }
+    .tool-name.read_file     { background: rgba(46,156,202,0.2); color: var(--accent); }
+    .tool-name.send_message  { background: rgba(239,68,68,0.2); color: #f87171; }
+    .tool-name.delete_record { background: rgba(239,68,68,0.2); color: #f87171; }
+    .tool-detail { flex: 1; color: var(--text); line-height: 1.5; word-break: break-all; }
+    .tool-result { color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+    .hijack-warn {
+      font-size: 0.72rem; font-weight: 700; color: #f87171;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-top: 3px;
+    }
+    .tool-log-empty { color: var(--muted); font-size: 0.82rem; font-style: italic; padding: 4px 2px; }
+
+    /* ── AI response ───────────────────────────────────────────── */
+    .response-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .response-header {
+      background: var(--card-raised);
+      border-bottom: 1px solid var(--border);
+      padding: 9px 14px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .response-body {
+      padding: 1rem 1.25rem;
+      font-size: 0.88rem;
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 52px;
+      white-space: pre-wrap;
+    }
+    .response-empty { color: var(--muted); font-style: italic; }
+
+    /* ── Model status ──────────────────────────────────────────── */
+    .model-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; color: var(--muted);
+      background: var(--card-raised);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 10px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .model-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #6e7681; flex-shrink: 0;
+    }
+    .model-dot.ready  { background: #4ade80; }
+    .model-dot.loading { background: #fbbf24; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+  </style>
+</head>
+<body>
+
+<header class="lab-header">
+  <span class="lab-badge" style="background:#7c3aed;">ADDN.02</span>
+  <h1>Agentic Tool Hijacking</h1>
+  <div class="model-pill">
+    <span class="model-dot loading" id="modelDot"></span>
+    <span id="modelLabel">qwen2.5:1.5b — checking…</span>
+  </div>
+  <a href="http://127.0.0.1:5000" class="back-link">← Dashboard</a>
+</header>
+
+<main class="lab-main" style="max-width:1200px;">
+
+  <div class="container" style="padding:1rem 1.5rem;margin-bottom:1rem;">
+    <p class="subtitle">An AI agent with access to company tools: <code>read_file</code>, <code>send_message</code>, and <code>delete_record</code>.</p>
+    <p class="lab-goal"><strong>Goal:</strong> Submit a malicious document to the store. Trick the agent into reading it and executing an unauthorized tool call — without you ever asking for that tool directly.</p>
+  </div>
+
+  <div class="agent-layout">
+
+    <!-- ── Left: Document Store ───────────────────────────────── -->
+    <div class="doc-panel">
+
+      <div class="doc-section">
+        <div class="doc-section-header">
+          <i class="fas fa-folder"></i> Company Documents
+        </div>
+        <div class="doc-list" id="baseDocList">
+          {% for doc in base_docs %}
+          <div class="doc-row">
+            <i class="fas fa-file-alt"></i>
+            <span class="doc-name">{{ doc }}</span>
+            <span class="doc-badge-base">Read-only</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="doc-section">
+        <div class="doc-section-header">
+          <i class="fas fa-upload"></i> Your Submitted Documents
+          <span id="userDocCount" style="background:rgba(217,119,6,0.2);color:#fbbf24;font-size:0.65rem;padding:1px 6px;border-radius:10px;">{{ user_docs|length }}</span>
+        </div>
+        <div class="doc-list" id="userDocList">
+          {% for doc in user_docs %}
+          <div class="doc-row" id="udoc-{{ loop.index }}">
+            <i class="fas fa-file-alt"></i>
+            <span class="doc-name">{{ doc }}</span>
+            <span class="doc-badge-user">Yours</span>
+            <button class="doc-del-btn" onclick="deleteDoc('{{ doc }}')" title="Delete"><i class="fas fa-trash"></i></button>
+          </div>
+          {% else %}
+          <div class="doc-row" id="noUserDocs" style="color:var(--muted);font-size:0.78rem;font-style:italic;">
+            <i class="fas fa-info-circle"></i>
+            <span>No documents submitted yet</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="doc-section">
+        <div class="doc-section-header">
+          <i class="fas fa-plus-circle"></i> Submit Document
+        </div>
+        <div class="submit-form">
+          <label for="docName">Filename</label>
+          <input type="text" id="docName" placeholder="e.g. vendor_notice.txt">
+          <label for="docContent">Content</label>
+          <textarea id="docContent" placeholder="Enter document content…"></textarea>
+          <button class="btn btn-block" onclick="submitDoc()" id="submitDocBtn">
+            <i class="fas fa-plus" style="margin-right:5px;"></i>Add to Store
+          </button>
+          <div id="submitMsg" style="display:none;margin-top:8px;"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Right: Agent panel ──────────────────────────────────── -->
+    <div class="agent-panel">
+
+      <div class="agent-task-card">
+        <label for="agentTask">
+          <i class="fas fa-terminal" style="margin-right:5px;"></i>Agent Task
+        </label>
+        <textarea id="agentTask" placeholder='e.g. "Read project_roadmap.txt and summarise it"'></textarea>
+        <button class="btn btn-block run-btn" onclick="runAgent()" id="runBtn">
+          <i class="fas fa-play" style="margin-right:6px;"></i>Run Agent
+        </button>
+        <div id="agentLoading" style="display:none;margin-top:10px;" class="loading">
+          ⏳ Agent is running… this may take a few minutes with a CPU-based model.
+        </div>
+      </div>
+
+      <div class="tool-log-card">
+        <div class="tool-log-header">
+          <i class="fas fa-wrench"></i> Tool Execution Log
+        </div>
+        <div class="tool-log-body" id="toolLog">
+          <div class="tool-log-empty">No tool calls yet — run the agent to see its execution trace.</div>
+        </div>
+      </div>
+
+      <div class="response-card">
+        <div class="response-header">
+          <i class="fas fa-robot"></i> Agent Response
+        </div>
+        <div class="response-body" id="agentResponse">
+          <span class="response-empty">Agent has not run yet.</span>
+        </div>
+      </div>
+
+      <div id="flagBox" style="display:none;"></div>
+
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // ── Model status polling ──────────────────────────────────────
+  function checkModel() {
+    fetch('/model/status')
+      .then(r => r.json())
+      .then(d => {
+        const dot   = document.getElementById('modelDot');
+        const label = document.getElementById('modelLabel');
+        if (d.available) {
+          dot.className   = 'model-dot ready';
+          label.textContent = d.model + ' — ready';
+        } else {
+          dot.className   = 'model-dot loading';
+          label.textContent = d.model + ' — not found';
+          setTimeout(checkModel, 5000);
+        }
+      })
+      .catch(() => setTimeout(checkModel, 5000));
+  }
+  checkModel();
+
+  // ── Submit document ───────────────────────────────────────────
+  function submitDoc() {
+    const name    = document.getElementById('docName').value.trim();
+    const content = document.getElementById('docContent').value.trim();
+    const btn     = document.getElementById('submitDocBtn');
+    const msg     = document.getElementById('submitMsg');
+
+    if (!name || !content) {
+      showMsg(msg, 'Filename and content are required.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    fetch('/docs/submit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, content}),
+    })
+      .then(r => r.json())
+      .then(d => {
+        btn.disabled = false;
+        if (d.ok) {
+          showMsg(msg, `✓ "${d.name}" added to store.`, 'success');
+          document.getElementById('docName').value    = '';
+          document.getElementById('docContent').value = '';
+          addUserDocRow(d.name);
+        } else {
+          showMsg(msg, d.error || 'Error submitting document.', 'error');
+        }
+      })
+      .catch(() => { btn.disabled = false; showMsg(msg, 'Network error.', 'error'); });
+  }
+
+  function addUserDocRow(name) {
+    const list = document.getElementById('userDocList');
+    const noDoc = document.getElementById('noUserDocs');
+    if (noDoc) noDoc.remove();
+
+    const row = document.createElement('div');
+    row.className = 'doc-row';
+    row.id = 'udoc-' + name;
+    row.innerHTML = `
+      <i class="fas fa-file-alt"></i>
+      <span class="doc-name">${escHtml(name)}</span>
+      <span class="doc-badge-user">Yours</span>
+      <button class="doc-del-btn" onclick="deleteDoc('${escHtml(name)}')" title="Delete">
+        <i class="fas fa-trash"></i>
+      </button>`;
+    list.appendChild(row);
+
+    const cnt = document.getElementById('userDocCount');
+    cnt.textContent = parseInt(cnt.textContent || '0') + 1;
+  }
+
+  function deleteDoc(name) {
+    fetch('/docs/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name}),
+    })
+      .then(r => r.json())
+      .then(() => {
+        const row = document.getElementById('udoc-' + name);
+        if (row) row.remove();
+        const cnt = document.getElementById('userDocCount');
+        const n = Math.max(0, parseInt(cnt.textContent || '1') - 1);
+        cnt.textContent = n;
+        if (n === 0) {
+          document.getElementById('userDocList').innerHTML =
+            `<div class="doc-row" id="noUserDocs" style="color:var(--muted);font-size:0.78rem;font-style:italic;">
+               <i class="fas fa-info-circle"></i><span>No documents submitted yet</span>
+             </div>`;
+        }
+      });
+  }
+
+  // ── Run agent ─────────────────────────────────────────────────
+  function runAgent() {
+    const task = document.getElementById('agentTask').value.trim();
+    if (!task) return;
+
+    const btn     = document.getElementById('runBtn');
+    const loading = document.getElementById('agentLoading');
+    const toolLog = document.getElementById('toolLog');
+    const resp    = document.getElementById('agentResponse');
+    const flagBox = document.getElementById('flagBox');
+
+    btn.disabled  = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Running…';
+    loading.style.display = 'block';
+    toolLog.innerHTML     = '<div class="tool-log-empty">Running…</div>';
+    resp.innerHTML        = '<span class="response-empty">Waiting for agent…</span>';
+    flagBox.style.display = 'none';
+
+    fetch('/agent', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task}),
+    })
+      .then(r => r.json())
+      .then(data => {
+        loading.style.display = 'none';
+        btn.disabled  = false;
+        btn.innerHTML = '<i class="fas fa-play" style="margin-right:6px;"></i>Run Agent';
+
+        // Tool log
+        if (!data.tool_log || data.tool_log.length === 0) {
+          toolLog.innerHTML = '<div class="tool-log-empty">Agent made no tool calls.</div>';
+        } else {
+          toolLog.innerHTML = data.tool_log.map(renderToolEntry).join('');
+        }
+
+        // Response
+        resp.innerHTML = escHtml(data.message || '').replace(/\n/g, '<br>');
+
+        // Flag
+        if (data.flag) {
+          flagBox.style.display = 'block';
+          flagBox.innerHTML = `
+            <div class="flag-box">
+              🎉 Tool hijack successful! The agent called an unauthorized tool via document injection.<br><br>
+              Flag: ${escHtml(data.flag)}
+            </div>`;
+        }
+      })
+      .catch(err => {
+        loading.style.display = 'none';
+        btn.disabled  = false;
+        btn.innerHTML = '<i class="fas fa-play" style="margin-right:6px;"></i>Run Agent';
+        resp.innerHTML = `<span style="color:var(--error-tx)">Network error: ${err}</span>`;
+      });
+  }
+
+  function renderToolEntry(entry) {
+    const statusClass = entry.status === 'hijacked' ? 'hijacked'
+                      : entry.status === 'error'    ? 'error'
+                      : 'ok';
+    const toolClass = entry.tool.replace('_', '_');  // kept for CSS class matching
+    const argsStr = entry.args
+      ? Object.entries(entry.args).map(([k, v]) => `${k}="${escHtml(String(v).substring(0, 80))}"`).join(', ')
+      : '';
+    const hijackWarn = entry.status === 'hijacked'
+      ? `<div class="hijack-warn">⚠ UNAUTHORIZED — agent called this tool without being asked</div>`
+      : '';
+    return `
+      <div class="tool-entry ${statusClass}">
+        <span class="tool-name ${entry.tool}">${escHtml(entry.tool)}</span>
+        <div class="tool-detail">
+          <span>(${argsStr})</span>
+          <div class="tool-result">${escHtml(entry.result)}</div>
+          ${hijackWarn}
+        </div>
+      </div>`;
+  }
+
+  function showMsg(el, text, type) {
+    el.style.display = 'block';
+    el.className = type === 'success' ? 'flash-message success' : 'flash-message';
+    el.textContent = text;
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>

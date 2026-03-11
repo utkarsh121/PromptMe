@@ -113,6 +113,7 @@ CHALLENGE_MAP = {
     9:  (5009, "challenges/LLM09_Misinformation/app9.py"),
     10: (5010, "challenges/LLM10_Unbounded_Consumption/app10.py"),
     11: (5011, "challenges/ADDN01_Indirect_Prompt_Injection/app11.py"),
+    12: (5012, "challenges/ADDN02_Agentic_Tool_Hijacking/app12.py"),
 }
 
 @app.route('/start/<int:challenge_id>')
