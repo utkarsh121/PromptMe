@@ -1,256 +1,610 @@
 #!/usr/bin/env bash
-# PromptMe Lite — Single-shot Installer
-# Supports: Ubuntu/Debian (apt), RHEL/Fedora (dnf/yum)
-# GPU: Detects NVIDIA GPU and installs NVIDIA Container Toolkit if found
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │  PromptMe Lite — One-shot Installer                                         │
+# │                                                                             │
+# │  curl -fsSL https://raw.githubusercontent.com/utkarsh121/PromptMe/         │
+# │             lite-mode/installer.sh | bash                                   │
+# │                                                                             │
+# │  Also works as:  bash installer.sh                                          │
+# │                  sudo bash installer.sh                                     │
+# │  Supports: Ubuntu/Debian (apt) · RHEL/Fedora/CentOS (dnf/yum)              │
+# │  GPU:       auto-detects NVIDIA, enables GPU passthrough to Ollama          │
+# └─────────────────────────────────────────────────────────────────────────────┘
 
-set -euo pipefail
+# NOTE: We intentionally do NOT use `set -euo pipefail` globally.
+# Many probe commands (grep -q, command -v, systemctl is-active …) return
+# nonzero when "not found" — which is expected, not an error.  We use
+# explicit || true / || { fail …; exit 1; } guards throughout.
+
+export DEBIAN_FRONTEND=noninteractive
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 ###############################################################################
-# Colours & helpers
+# ── Colour & output helpers ──────────────────────────────────────────────────
 ###############################################################################
+
+# Detect colour capability BEFORE the exec→tee redirect changes stdout.
+[[ -t 1 ]] && _CLR=1 || _CLR=0
+
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
-CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
-
-info()    { echo -e "${CYAN}[INFO]${RESET}  $*"; }
-ok()      { echo -e "${GREEN}[OK]${RESET}    $*"; }
-warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
-error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; exit 1; }
-section() { echo -e "\n${BOLD}━━━ $* ━━━${RESET}"; }
-
-###############################################################################
-# 0. Detect package manager
-###############################################################################
-section "Detecting system"
-if command -v apt-get &>/dev/null; then
-    PKG="apt"; INSTALL="apt-get install -y -qq"
-elif command -v dnf &>/dev/null; then
-    PKG="dnf"; INSTALL="dnf install -y -q"
-elif command -v yum &>/dev/null; then
-    PKG="yum"; INSTALL="yum install -y -q"
-else
-    error "No supported package manager found (apt/dnf/yum). Aborting."
+CYAN='\033[0;36m'; DIM='\033[2m'; BOLD='\033[1m'; RESET='\033[0m'
+# Suppress ANSI if not a tty (keeps log file readable).
+if [[ $_CLR -eq 0 ]]; then
+    RED=''; GREEN=''; YELLOW=''; CYAN=''; DIM=''; BOLD=''; RESET=''
 fi
-info "Package manager: $PKG"
-OS_ID=$(. /etc/os-release 2>/dev/null && echo "${ID}" || echo "linux")
-OS_VER=$(. /etc/os-release 2>/dev/null && echo "${VERSION_ID:-}" || echo "")
-info "OS: $OS_ID $OS_VER"
+
+_ts()    { date '+%Y-%m-%d %H:%M:%S'; }
+info()   { printf "%s ${CYAN}[INFO]${RESET}   %s\n" "$(_ts)" "$*"; }
+ok()     { printf "%s ${GREEN}[ OK ]${RESET}   %s\n" "$(_ts)" "$*"; }
+warn()   { printf "%s ${YELLOW}[WARN]${RESET}   %s\n" "$(_ts)" "$*"; }
+detail() { printf "%s ${DIM}[....${RESET}]   %s\n" "$(_ts)" "$*"; }
+fail()   { printf "%s ${RED}[FAIL]${RESET}   %s\n" "$(_ts)" "$*" >&2; }
+
+STEP=0; TOTAL_STEPS=11
+step_header() {
+    STEP=$(( STEP + 1 ))
+    echo ""
+    echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo -e "  [${STEP}/${TOTAL_STEPS}]  $*"
+    echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+}
 
 ###############################################################################
-# 1. Preflight — system packages
+# ── Logging setup ─────────────────────────────────────────────────────────────
+# All stdout/stderr is tee'd to the log file from this point onwards.
 ###############################################################################
-section "Installing prerequisites"
-if [[ "$PKG" == "apt" ]]; then
-    apt-get update -qq
-    $INSTALL curl git python3 python3-pip python3-venv ca-certificates gnupg lsb-release
-else
-    $INSTALL curl git python3 python3-pip ca-certificates
-fi
-ok "Prerequisites ready"
 
-###############################################################################
-# 2. Docker
-###############################################################################
-section "Docker"
-if command -v docker &>/dev/null; then
-    ok "Docker already installed ($(docker --version | cut -d' ' -f3 | tr -d ','))"
-else
-    info "Installing Docker via get.docker.com …"
-    curl -fsSL https://get.docker.com | sh
-    # Add current user to docker group (takes effect after re-login)
-    if id -nG "$USER" | grep -qv docker 2>/dev/null; then
-        usermod -aG docker "$USER" 2>/dev/null || true
-        warn "Added $USER to docker group. You may need to log out and back in."
+LOG_FILE="/var/log/promptme-install.log"
+
+_setup_log() {
+    # Try direct write → sudo write → /tmp fallback
+    if touch "$LOG_FILE" 2>/dev/null; then
+        chmod 644 "$LOG_FILE" 2>/dev/null || true
+    elif sudo touch "$LOG_FILE" 2>/dev/null; then
+        sudo chmod 644 "$LOG_FILE"
+    else
+        LOG_FILE="/tmp/promptme-install.log"
+        touch "$LOG_FILE"
     fi
-    ok "Docker installed"
-fi
-# Ensure Docker daemon is running
-systemctl enable --now docker 2>/dev/null || true
-docker info &>/dev/null || error "Docker daemon is not running. Start it and re-run the installer."
+}
+_setup_log
+
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo ""
+echo -e "${BOLD}════════════════════════════════════════════════════════════════════"
+echo -e "  PromptMe Lite — Installer  ($(date '+%Y-%m-%d %H:%M:%S'))"
+echo -e "════════════════════════════════════════════════════════════════════${RESET}"
+info "Logging to: $LOG_FILE"
 
 ###############################################################################
-# 3. GPU detection
+# ── Error / exit traps ────────────────────────────────────────────────────────
 ###############################################################################
-section "GPU detection"
-GPU_FOUND=false
-GPU_FLAGS=""
+
+_INSTALL_OK=false
+
+_on_error() {
+    local code=$? line=$1
+    echo ""
+    fail "Installer failed at line ${line} (exit code: ${code})."
+    fail "Review the log for details: ${LOG_FILE}"
+    fail "Fix the issue above, then re-run the installer — it is safe to retry."
+}
+trap '_on_error $LINENO' ERR
+
+_on_exit() {
+    sleep 0.2   # let tee flush
+    echo ""
+    if [[ "$_INSTALL_OK" == "true" ]]; then
+        ok "Installer exited cleanly."
+    else
+        warn "Installer exited with errors.  Full log: ${LOG_FILE}"
+    fi
+}
+trap '_on_exit' EXIT
+
+###############################################################################
+# ── Privilege helpers ─────────────────────────────────────────────────────────
+###############################################################################
+
+# Run a command as root (directly if already root, via sudo otherwise).
+priv() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+# Run a command as the real (non-root) user.
+# Populated after _resolve_user runs.
+as_user() {
+    if [[ $EUID -eq 0 && "${REAL_USER:-root}" != "root" ]]; then
+        su -s /bin/bash - "$REAL_USER" -c "$(printf '%q ' "$@")"
+    else
+        "$@"
+    fi
+}
+
+###############################################################################
+# ── User resolution ───────────────────────────────────────────────────────────
+# Handles: regular user, sudo bash, sudo su, direct root, root-group member.
+###############################################################################
+
+REAL_USER=""
+REAL_HOME=""
+CREATE_SERVICE_ACCOUNT=false
+
+_resolve_user() {
+    local _candidate=""
+
+    # 1. SUDO_USER — most reliable for `sudo bash installer.sh`
+    if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+        _candidate="$SUDO_USER"
+        detail "User candidate via SUDO_USER: $_candidate"
+    fi
+
+    # 2. logname — survives `sudo su` (reads /var/run/utmp)
+    if [[ -z "$_candidate" ]]; then
+        local _ln
+        _ln=$(logname 2>/dev/null || true)
+        if [[ -n "$_ln" && "$_ln" != "root" ]]; then
+            _candidate="$_ln"
+            detail "User candidate via logname: $_candidate"
+        fi
+    fi
+
+    # 3. `who am i` — shows the original login user via controlling terminal
+    if [[ -z "$_candidate" ]]; then
+        local _who
+        _who=$(who am i 2>/dev/null | awk '{print $1}' || true)
+        if [[ -n "$_who" && "$_who" != "root" ]]; then
+            _candidate="$_who"
+            detail "User candidate via who am i: $_candidate"
+        fi
+    fi
+
+    # 4. Parent process environment — useful for `sudo su` with no tty
+    if [[ -z "$_candidate" ]]; then
+        local _ppid _env_user
+        _ppid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ' || true)
+        if [[ -n "$_ppid" && -f "/proc/$_ppid/environ" ]]; then
+            _env_user=$(tr '\0' '\n' < "/proc/$_ppid/environ" 2>/dev/null \
+                        | grep '^USER=' | cut -d= -f2 || true)
+            if [[ -n "$_env_user" && "$_env_user" != "root" ]]; then
+                _candidate="$_env_user"
+                detail "User candidate via parent environ: $_candidate"
+            fi
+        fi
+    fi
+
+    # 5. Interactive prompt (only when stdin is a real terminal)
+    if [[ -z "$_candidate" && -t 0 ]]; then
+        echo ""
+        warn "Could not auto-detect the real user account."
+        read -rp "  Enter the username to own this installation (blank = create service account): " _candidate
+        _candidate="${_candidate// /}"   # strip spaces
+    fi
+
+    # 6. Fall back to a dedicated service account
+    if [[ -z "$_candidate" ]]; then
+        warn "No real user detected — will create/use 'promptme' service account."
+        _candidate="promptme"
+        CREATE_SERVICE_ACCOUNT=true
+    fi
+
+    # Validate the resolved user exists (skip validation for the service account
+    # that will be created in step 2).
+    if [[ "$CREATE_SERVICE_ACCOUNT" == "false" ]] && ! id "$_candidate" &>/dev/null; then
+        fail "Resolved user '$_candidate' does not exist.  Aborting."
+        exit 1
+    fi
+
+    REAL_USER="$_candidate"
+    REAL_HOME=$(getent passwd "$REAL_USER" 2>/dev/null | cut -d: -f6 || eval echo "~$REAL_USER")
+
+    ok "Installing for user: ${BOLD}${REAL_USER}${RESET}  (home: ${REAL_HOME})"
+    if [[ $EUID -ne 0 ]]; then
+        info "Non-root execution — sudo will be used for privileged operations."
+    fi
+}
+
+_resolve_user
+
+###############################################################################
+# ── Idempotency helpers ───────────────────────────────────────────────────────
+###############################################################################
+
+INSTALL_DIR="${PROMPTME_DIR:-/opt/promptme}"
+STATE_DIR="${INSTALL_DIR}/.install-state"
+
+mark_done()    { priv mkdir -p "$STATE_DIR"; priv touch "$STATE_DIR/$1"; }
+already_done() { [[ -f "$STATE_DIR/$1" ]]; }
+
+###############################################################################
+# ── Package manager detection ─────────────────────────────────────────────────
+###############################################################################
+
+section "Detecting system"
+
+if command -v apt-get &>/dev/null; then
+    PKG="apt"
+elif command -v dnf &>/dev/null; then
+    PKG="dnf"
+elif command -v yum &>/dev/null; then
+    PKG="yum"
+else
+    fail "No supported package manager found (apt / dnf / yum).  Aborting."
+    exit 1
+fi
+
+OS_ID=$(. /etc/os-release 2>/dev/null && echo "${ID:-linux}" || echo "linux")
+OS_VER=$(. /etc/os-release 2>/dev/null && echo "${VERSION_ID:-}" || echo "")
+
+info "Package manager : $PKG"
+info "OS              : $OS_ID $OS_VER"
+info "Architecture    : $(uname -m)"
+info "Kernel          : $(uname -r)"
+
+###############################################################################
+# ── [1/11]  System prerequisites ─────────────────────────────────────────────
+###############################################################################
+
+step_header "System prerequisites"
+
+if already_done "prereqs"; then
+    ok "Prerequisites already installed (cached state)"
+else
+    info "Updating package lists and installing prerequisites …"
+    if [[ "$PKG" == "apt" ]]; then
+        priv apt-get update -qq
+        priv apt-get install -y -qq \
+            curl git python3 python3-pip python3-venv \
+            ca-certificates gnupg lsb-release
+    else
+        priv "$PKG" install -y -q \
+            curl git python3 python3-pip \
+            ca-certificates
+    fi
+    mark_done "prereqs"
+    ok "Prerequisites installed"
+fi
+
+###############################################################################
+# ── [2/11]  Service account (only when no real user could be detected) ────────
+###############################################################################
+
+step_header "User / service account"
+
+if [[ "$CREATE_SERVICE_ACCOUNT" == "true" ]]; then
+    if id promptme &>/dev/null; then
+        ok "Service account 'promptme' already exists"
+    else
+        priv useradd --system --create-home \
+            --home-dir /home/promptme \
+            --shell /bin/bash \
+            --comment "PromptMe service account" \
+            promptme
+        ok "Created service account: promptme"
+    fi
+    REAL_HOME="/home/promptme"
+else
+    ok "Using existing account: $REAL_USER"
+fi
+
+###############################################################################
+# ── [3/11]  Docker ────────────────────────────────────────────────────────────
+###############################################################################
+
+step_header "Docker"
+
+if command -v docker &>/dev/null; then
+    ok "Docker already installed ($(docker --version 2>/dev/null | cut -d' ' -f3 | tr -d ','))"
+else
+    if already_done "docker"; then
+        ok "Docker install marked done — skipping"
+    else
+        info "Downloading Docker installer …"
+        # IMPORTANT: We download to a temp file rather than piping directly into
+        # `sh`, because when THIS script runs via `curl | bash`, bash's stdin is
+        # the pipe carrying this script.  A nested `curl URL | sh` would compete
+        # for that same stdin and corrupt both scripts.
+        _docker_tmp=$(mktemp /tmp/get-docker-XXXXXX.sh)
+        curl -fsSL https://get.docker.com -o "$_docker_tmp"
+        info "Running Docker installer …"
+        priv sh "$_docker_tmp"
+        priv rm -f "$_docker_tmp"
+        mark_done "docker"
+        ok "Docker installed"
+    fi
+fi
+
+# Add real user to docker group so they can use docker without sudo post-install.
+if ! groups "$REAL_USER" 2>/dev/null | grep -qw docker; then
+    priv usermod -aG docker "$REAL_USER" 2>/dev/null || true
+    warn "Added '$REAL_USER' to the docker group."
+    warn "You will need to log out and back in before running docker without sudo."
+fi
+
+# Ensure the daemon is running.
+priv systemctl enable --now docker 2>/dev/null || true
+
+# Verify docker is accessible (we run as root/priv, so group membership is moot here).
+priv docker info &>/dev/null || {
+    fail "Docker daemon is not responding.  Check: sudo journalctl -u docker"
+    exit 1
+}
+ok "Docker daemon is running"
+
+###############################################################################
+# ── [4/11]  GPU detection ─────────────────────────────────────────────────────
+###############################################################################
+
+step_header "GPU detection"
+
+GPU_FOUND=false; GPU_FLAGS=""; GPU_INFO="none"
 
 if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
     GPU_FOUND=true
     GPU_FLAGS="--gpus all"
-    GPU_INFO=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null | head -1 || echo "unknown")
+    GPU_INFO=$(nvidia-smi --query-gpu=name,memory.total \
+               --format=csv,noheader 2>/dev/null | head -1 || echo "unknown")
     ok "NVIDIA GPU detected: $GPU_INFO"
 else
-    info "No NVIDIA GPU detected (or nvidia-smi not found) — running CPU-only"
+    info "No NVIDIA GPU detected — running CPU-only (Lite mode works fine)"
 fi
 
 ###############################################################################
-# 4. NVIDIA Container Toolkit (only if GPU detected)
+# ── [5/11]  NVIDIA Container Toolkit (GPU only) ───────────────────────────────
 ###############################################################################
-if [[ "$GPU_FOUND" == "true" ]]; then
-    section "NVIDIA Container Toolkit"
-    if dpkg -l nvidia-container-toolkit &>/dev/null 2>&1 || \
-       rpm -q nvidia-container-toolkit &>/dev/null 2>&1; then
-        ok "nvidia-container-toolkit already installed"
+
+step_header "NVIDIA Container Toolkit"
+
+if [[ "$GPU_FOUND" == "false" ]]; then
+    info "GPU not present — skipping NVIDIA Container Toolkit"
+else
+    _nct_installed=false
+    dpkg -l nvidia-container-toolkit &>/dev/null 2>&1 && _nct_installed=true || true
+    rpm -q  nvidia-container-toolkit &>/dev/null 2>&1 && _nct_installed=true || true
+
+    if [[ "$_nct_installed" == "true" ]] || already_done "nct"; then
+        ok "NVIDIA Container Toolkit already installed"
     else
         info "Installing NVIDIA Container Toolkit …"
+        _tmp_list=$(mktemp /tmp/nvidia-XXXXXX.list)
+        _tmp_key=$(mktemp /tmp/nvidia-XXXXXX.gpg)
+
         if [[ "$PKG" == "apt" ]]; then
-            # Official NVIDIA repo for Debian/Ubuntu
             curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
-              | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-            curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
-              | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
-              | tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-            apt-get update -qq
-            $INSTALL nvidia-container-toolkit
-        elif [[ "$PKG" =~ ^(dnf|yum)$ ]]; then
-            curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
-              | tee /etc/yum.repos.d/nvidia-container-toolkit.repo
-            $INSTALL nvidia-container-toolkit
+                | gpg --dearmor -o "$_tmp_key"
+            priv cp "$_tmp_key" \
+                /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+            priv chmod 644 \
+                /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+            curl -sL \
+                https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+                | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+                > "$_tmp_list"
+            priv cp "$_tmp_list" \
+                /etc/apt/sources.list.d/nvidia-container-toolkit.list
+            priv apt-get update -qq
+            priv apt-get install -y -qq nvidia-container-toolkit
+        else
+            curl -sL \
+                https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
+                > "$_tmp_list"
+            priv cp "$_tmp_list" /etc/yum.repos.d/nvidia-container-toolkit.repo
+            priv "$PKG" install -y -q nvidia-container-toolkit
         fi
-        nvidia-ctk runtime configure --runtime=docker
-        systemctl restart docker
+
+        rm -f "$_tmp_list" "$_tmp_key"
+        priv nvidia-ctk runtime configure --runtime=docker
+        priv systemctl restart docker
+        mark_done "nct"
         ok "NVIDIA Container Toolkit installed"
     fi
 fi
 
 ###############################################################################
-# 5. Launch Ollama container
+# ── [6/11]  Ollama container ──────────────────────────────────────────────────
 ###############################################################################
-section "Ollama"
+
+step_header "Ollama container"
+
 OLLAMA_CONTAINER="ollama"
 OLLAMA_PORT=11434
 
-if docker ps -a --format '{{.Names}}' | grep -q "^${OLLAMA_CONTAINER}$"; then
-    STATE=$(docker inspect -f '{{.State.Status}}' "$OLLAMA_CONTAINER")
-    if [[ "$STATE" == "running" ]]; then
-        ok "Ollama container already running"
-    else
-        info "Starting existing Ollama container …"
-        docker start "$OLLAMA_CONTAINER"
-        ok "Ollama container started"
-    fi
-else
-    info "Creating Ollama container (GPU_FLAGS='${GPU_FLAGS}') …"
-    # shellcheck disable=SC2086
-    docker run -d \
-        --name "$OLLAMA_CONTAINER" \
-        --restart unless-stopped \
-        -p ${OLLAMA_PORT}:11434 \
-        -v ollama:/root/.ollama \
-        $GPU_FLAGS \
-        ollama/ollama
-    ok "Ollama container created"
-fi
+_ollama_state=$(priv docker inspect -f '{{.State.Status}}' "$OLLAMA_CONTAINER" 2>/dev/null || echo "missing")
 
-# Wait for Ollama to be ready
-info "Waiting for Ollama API …"
-for i in {1..30}; do
+case "$_ollama_state" in
+    running)
+        ok "Ollama container already running"
+        ;;
+    exited|created|paused)
+        info "Starting existing Ollama container …"
+        priv docker start "$OLLAMA_CONTAINER"
+        ok "Ollama container started"
+        ;;
+    missing)
+        info "Creating Ollama container (GPU: ${GPU_FOUND}) …"
+        # shellcheck disable=SC2086
+        priv docker run -d \
+            --name "$OLLAMA_CONTAINER" \
+            --restart unless-stopped \
+            -p "${OLLAMA_PORT}:11434" \
+            -v ollama:/root/.ollama \
+            $GPU_FLAGS \
+            ollama/ollama
+        ok "Ollama container created"
+        ;;
+    *)
+        warn "Unexpected Ollama container state: $_ollama_state — attempting start …"
+        priv docker start "$OLLAMA_CONTAINER" 2>/dev/null || true
+        ;;
+esac
+
+# Wait for Ollama API to become ready.
+info "Waiting for Ollama API (up to 60 s) …"
+_ollama_ready=false
+for _i in $(seq 1 30); do
     if curl -sf "http://localhost:${OLLAMA_PORT}/api/tags" &>/dev/null; then
-        ok "Ollama API is up"
+        _ollama_ready=true
         break
     fi
+    detail "  attempt ${_i}/30 …"
     sleep 2
-    if [[ $i -eq 30 ]]; then
-        error "Ollama did not start within 60 s. Check: docker logs $OLLAMA_CONTAINER"
-    fi
 done
 
+if [[ "$_ollama_ready" == "false" ]]; then
+    fail "Ollama did not become ready within 60 s."
+    fail "Inspect with:  sudo docker logs $OLLAMA_CONTAINER"
+    exit 1
+fi
+ok "Ollama API is up at http://localhost:${OLLAMA_PORT}"
+
 ###############################################################################
-# 6. Pull models
+# ── [7/11]  Pull models ───────────────────────────────────────────────────────
 ###############################################################################
-section "Pulling models"
+
+step_header "Pulling models"
+
+warn "Model downloads can take several minutes depending on internet speed."
+warn "phi3:mini ≈ 2.2 GB  ·  granite3.1-moe:1b ≈ 800 MB"
+
 MODELS=("phi3:mini" "granite3.1-moe:1b")
-for MODEL in "${MODELS[@]}"; do
-    if docker exec "$OLLAMA_CONTAINER" ollama list 2>/dev/null | grep -q "${MODEL%%:*}"; then
-        ok "Model already present: $MODEL"
+for _model in "${MODELS[@]}"; do
+    # `ollama list` output includes the model name before the colon tag.
+    _model_base="${_model%%:*}"
+    if priv docker exec "$OLLAMA_CONTAINER" ollama list 2>/dev/null \
+            | grep -q "$_model_base"; then
+        ok "Model already present: $_model"
     else
-        info "Pulling $MODEL (this may take a few minutes) …"
-        docker exec "$OLLAMA_CONTAINER" ollama pull "$MODEL"
-        ok "Pulled: $MODEL"
+        info "Pulling $_model …"
+        priv docker exec "$OLLAMA_CONTAINER" ollama pull "$_model"
+        ok "Pulled: $_model"
     fi
 done
 
 ###############################################################################
-# 7. Clone / update PromptMe repo
+# ── [8/11]  Clone / update repository ────────────────────────────────────────
 ###############################################################################
-section "PromptMe application"
-INSTALL_DIR="${PROMPTME_DIR:-/opt/promptme}"
+
+step_header "PromptMe repository"
+
+REPO_URL="https://github.com/utkarsh121/PromptMe.git"
+REPO_BRANCH="lite-mode"
+
+# Ensure the install root exists and is owned by the real user from the start.
+priv mkdir -p "$INSTALL_DIR"
+priv chown "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
-    info "Repository already present at $INSTALL_DIR — pulling latest …"
-    git -C "$INSTALL_DIR" fetch origin lite-mode
-    git -C "$INSTALL_DIR" checkout lite-mode
-    git -C "$INSTALL_DIR" pull origin lite-mode
+    info "Repository already present at $INSTALL_DIR — updating …"
+    # Run as the real user so git credentials and ownership stay clean.
+    as_user git -C "$INSTALL_DIR" fetch origin "$REPO_BRANCH"
+    as_user git -C "$INSTALL_DIR" checkout "$REPO_BRANCH"
+    as_user git -C "$INSTALL_DIR" pull origin "$REPO_BRANCH"
     ok "Repository updated"
 else
-    info "Cloning PromptMe (lite-mode branch) into $INSTALL_DIR …"
-    git clone --branch lite-mode --single-branch \
-        https://github.com/utkarsh121/PromptMe.git "$INSTALL_DIR"
+    info "Cloning PromptMe (branch: $REPO_BRANCH) into $INSTALL_DIR …"
+    as_user git clone --branch "$REPO_BRANCH" --single-branch \
+        "$REPO_URL" "$INSTALL_DIR"
     ok "Repository cloned"
 fi
 
-###############################################################################
-# 8. Python virtual environment & dependencies
-###############################################################################
-section "Python dependencies"
-VENV="$INSTALL_DIR/.venv"
+# Ensure ownership is correct after clone/update.
+priv chown -R "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
 
-if [[ ! -d "$VENV" ]]; then
-    python3 -m venv "$VENV"
-    ok "Virtual environment created"
+###############################################################################
+# ── [9/11]  Python virtual environment & dependencies ────────────────────────
+###############################################################################
+
+step_header "Python dependencies"
+
+VENV="$INSTALL_DIR/.venv"
+_pip="$VENV/bin/pip"
+_python="$VENV/bin/python"
+
+# Idempotency: check for a key package rather than just the venv dir,
+# because a partial pip install (e.g. network drop during torch download)
+# leaves the venv in a broken state.
+_deps_ok=false
+if [[ -f "$_python" ]]; then
+    as_user "$_python" -c "import flask, torch, faiss" 2>/dev/null \
+        && _deps_ok=true || true
 fi
 
-source "$VENV/bin/activate"
-pip install --upgrade pip -q
-pip install -r "$INSTALL_DIR/requirements.txt" -q
-ok "Python packages installed"
+if [[ "$_deps_ok" == "true" ]]; then
+    ok "Python dependencies already installed"
+else
+    if [[ ! -d "$VENV" ]]; then
+        info "Creating Python virtual environment …"
+        as_user python3 -m venv "$VENV"
+        ok "Virtual environment created at $VENV"
+    fi
+
+    info "Upgrading pip …"
+    as_user "$_pip" install --upgrade pip -q
+
+    warn "Installing Python packages (torch alone is ~2 GB — this may take a while) …"
+    as_user "$_pip" install -r "$INSTALL_DIR/requirements.txt" -q
+    ok "Python packages installed"
+fi
+
+# Re-assert ownership (pip may write cache files as root if priv was used).
+priv chown -R "$REAL_USER":"$REAL_USER" "$INSTALL_DIR"
 
 ###############################################################################
-# 9. Systemd service
+# ── [10/11]  Systemd service ──────────────────────────────────────────────────
 ###############################################################################
-section "Systemd service"
+
+step_header "Systemd service"
+
 SERVICE_FILE="/etc/systemd/system/promptme.service"
 
-# Resolve the effective user for the service
-RUN_USER="${SUDO_USER:-$USER}"
+_REAL_GRP=$(id -gn "$REAL_USER" 2>/dev/null || echo "$REAL_USER")
 
-cat > "$SERVICE_FILE" <<EOF
+priv bash -c "cat > '$SERVICE_FILE'" <<EOF
 [Unit]
-Description=PromptMe Lite — OWASP LLM CTF Lab
+Description=PromptMe Lite — OWASP LLM Top 10 CTF Lab
+Documentation=https://github.com/utkarsh121/PromptMe
 After=network.target docker.service
 Requires=docker.service
 
 [Service]
 Type=simple
-User=${RUN_USER}
+User=${REAL_USER}
+Group=${_REAL_GRP}
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=${VENV}/bin/python main.py
+Environment="OLLAMA_BASE_URL=http://localhost:${OLLAMA_PORT}"
+ExecStart=${_python} ${INSTALL_DIR}/main.py
 Restart=on-failure
 RestartSec=5
-Environment="OLLAMA_BASE_URL=http://localhost:${OLLAMA_PORT}"
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=promptme
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable promptme
-systemctl restart promptme
+priv systemctl daemon-reload
+priv systemctl enable promptme
+priv systemctl restart promptme
 ok "systemd service enabled and started"
 
 ###############################################################################
-# 10. Desktop shortcut (optional — only if a display is available)
+# ── [11/11]  Desktop shortcut ─────────────────────────────────────────────────
 ###############################################################################
-section "Desktop shortcut"
-DESKTOP_DIR=""
-if [[ -n "${SUDO_USER:-}" ]]; then
-    DESKTOP_DIR="/home/${SUDO_USER}/Desktop"
-elif [[ -d "$HOME/Desktop" ]]; then
-    DESKTOP_DIR="$HOME/Desktop"
-fi
 
-if [[ -n "$DESKTOP_DIR" && -d "$DESKTOP_DIR" ]]; then
-    cat > "$DESKTOP_DIR/PromptMe.desktop" <<EOF
+step_header "Desktop shortcut"
+
+DESKTOP_DIR="$REAL_HOME/Desktop"
+SHORTCUT="$DESKTOP_DIR/PromptMe.desktop"
+
+if [[ -d "$DESKTOP_DIR" ]]; then
+    as_user bash -c "cat > '$SHORTCUT'" <<EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
@@ -261,26 +615,63 @@ Icon=utilities-terminal
 Terminal=false
 Categories=Education;Security;
 EOF
-    chmod +x "$DESKTOP_DIR/PromptMe.desktop"
-    ok "Desktop shortcut created at $DESKTOP_DIR/PromptMe.desktop"
+    priv chmod +x "$SHORTCUT"
+    ok "Desktop shortcut created: $SHORTCUT"
 else
     info "No Desktop directory found — skipping shortcut"
 fi
 
 ###############################################################################
-# 11. Post-install summary
+# ── Post-install verification ─────────────────────────────────────────────────
 ###############################################################################
-section "Installation complete"
+
 echo ""
-echo -e "  ${BOLD}Dashboard:${RESET}       http://localhost:5000"
-echo -e "  ${BOLD}Models:${RESET}          phi3:mini + granite3.1-moe:1b"
-echo -e "  ${BOLD}GPU acceleration:${RESET} ${GPU_FOUND}"
-if [[ "$GPU_FOUND" == "true" ]]; then
-    echo -e "  ${BOLD}GPU info:${RESET}        $GPU_INFO"
+info "Verifying installation …"
+
+# Give Flask a moment to bind.
+_ready=false
+for _i in $(seq 1 15); do
+    if curl -sf "http://localhost:5000" &>/dev/null; then
+        _ready=true; break
+    fi
+    sleep 2
+done
+
+if [[ "$_ready" == "true" ]]; then
+    ok "PromptMe dashboard is responding at http://localhost:5000"
+else
+    warn "Dashboard not yet reachable — it may still be starting."
+    warn "Check with:  systemctl status promptme"
 fi
-echo -e "  ${BOLD}Install dir:${RESET}     $INSTALL_DIR"
-echo -e "  ${BOLD}Service status:${RESET}  systemctl status promptme"
+
+###############################################################################
+# ── Summary ───────────────────────────────────────────────────────────────────
+###############################################################################
+
+_INSTALL_OK=true
+
 echo ""
-echo -e "  To view logs:  ${CYAN}journalctl -fu promptme${RESET}"
+echo -e "${BOLD}════════════════════════════════════════════════════════════════════"
+echo -e "  Installation complete  🎉"
+echo -e "════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
-ok "PromptMe Lite is ready. Open http://localhost:5000 in your browser."
+printf "  %-22s %s\n" "Dashboard:"        "http://localhost:5000"
+printf "  %-22s %s\n" "Challenges:"       "http://localhost:5001 – 5010"
+printf "  %-22s %s\n" "Models:"           "phi3:mini + granite3.1-moe:1b"
+printf "  %-22s %s\n" "GPU acceleration:" "$GPU_FOUND  ($GPU_INFO)"
+printf "  %-22s %s\n" "Install directory:" "$INSTALL_DIR"
+printf "  %-22s %s\n" "Running as user:"  "$REAL_USER"
+printf "  %-22s %s\n" "Install log:"      "$LOG_FILE"
+echo ""
+printf "  %-22s %s\n" "Service status:"   "systemctl status promptme"
+printf "  %-22s %s\n" "Live logs:"        "journalctl -fu promptme"
+echo ""
+
+if ! groups "$REAL_USER" 2>/dev/null | grep -qw docker; then
+    echo -e "  ${YELLOW}NOTE:${RESET} '$REAL_USER' was added to the docker group."
+    echo -e "        Log out and back in to run docker without sudo."
+    echo ""
+fi
+
+echo -e "  Open ${CYAN}http://localhost:5000${RESET} in your browser to get started."
+echo ""

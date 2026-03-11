@@ -23,7 +23,19 @@ The dashboard supports two modes to accommodate different hardware:
 
 ---
 
-## Getting Started
+## Quick Install
+
+This branch ships a one-shot installer that handles everything: Docker, Ollama, model downloads, Python dependencies, and a systemd service — with no manual steps required. It works whether you run it as a regular user, via `sudo`, or directly as root, and logs the full install to `/var/log/promptme-install.log`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/utkarsh121/PromptMe/lite-mode/installer.sh | bash
+```
+
+Once complete, open **http://localhost:5000** in your browser.
+
+---
+
+## Manual Setup
 
 ### Prerequisites
 
